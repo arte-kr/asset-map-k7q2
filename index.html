@@ -74,6 +74,8 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e5483f;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .arow{display:grid;grid-template-columns:minmax(0,1fr) 214px;gap:8px;align-items:center}
 .ai{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;min-width:0;cursor:pointer;font-size:13px}
+.row.ar{margin:0 -16px;padding:10px 16px 10px 20px;box-shadow:inset 4px 0 0 var(--sc,transparent)}.ar.sc-ok{--sc:#00B050}.ar.sc-wn{--sc:#F59E0B}.ar.sc-er{--sc:#FF0000}.ar.sc-in{--sc:#185EA5}
+.ah{padding-left:20px!important}
 .ai.n4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .ai>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .ah{margin:0 -16px;padding:9px 16px;background:var(--tag);color:var(--tx);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd)}.ah .ai{cursor:default;font-size:13px;font-weight:700}
@@ -302,6 +304,7 @@ function zoneOpts(except){
 }
 function openZone(zid){cur={t:'zone',id:zid};drawZone()}
 const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'미배정');
+const sc=a=>a.status==='분실'?' sc-er':a.status==='폐기'?' sc-in':a.status==='처분'?' sc-wn':!a.zone_id?' sc-ok':'';
 const aCols=(a,lc=true)=>`${lc?`<span>${esc(zname(a))}</span>`:''}<span>${esc(a.drawing_code||'')}</span><span>${esc(a.asset_no||'')}</span><b>${esc(a.name)}</b><span>${esc(a.manager||'')}</span>`;
 let srt={k:null,d:1};
 const sval=(a,k)=>k==='loc'?zname(a):(a[k]||'');
@@ -311,7 +314,7 @@ const aHead=(lc=true)=>`<div class="arow ah"><div class="ai${lc?'':' n4'}">${lc?
 function bindSort(o){o.querySelectorAll('.ah [data-sort]').forEach(e=>e.onclick=()=>{const k=e.dataset.sort;srt=srt.k===k?{k,d:-srt.d}:{k,d:1};if(cur?.t==='zone')drawZone();else if(cur?.t==='pool')drawPool()})}
 const aDetail=a=>[a.detail_loc&&`상세위치 ${a.detail_loc}`,a.note&&`비고 ${a.note}`].filter(Boolean).join(' · ')||'등록된 상세 정보가 없습니다.';
 function assetRow(a){
-  return `<div class="row" data-id="${a.id}"><div class="arow"><div class="ai n4" data-info title="눌러서 상세 보기">${aCols(a,false)}</div><span class="ba"><button class="b3" data-mv>이동</button><button class="b3" data-st>상태</button><button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`;
+  return `<div class="row ar${sc(a)}" data-id="${a.id}"><div class="arow"><div class="ai n4" data-info title="눌러서 상세 보기">${aCols(a,false)}</div><span class="ba"><button class="b3" data-mv>이동</button><button class="b3" data-st>상태</button><button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`;
 }
 function drawZone(){
   const z=byId(D.z,cur.id);if(!z){closeModal();return}
@@ -397,7 +400,7 @@ function drawPool(){
   const as=idle?[]:sortAssets(D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k))));
   const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색${idle?'':` · ${as.length}개`}</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
   <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
-  ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':'<button class="b3" data-as>구역 배정</button>'}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
+  ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row ar${sc(a)}" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':'<button class="b3" data-as>구역 배정</button>'}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
   bindSort(o);
   const qi=o.querySelector('#pq');
   qi.oninput=()=>{cur.qs=qi.value;clearTimeout(drawPool.t);drawPool.t=setTimeout(()=>{drawPool();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
@@ -531,7 +534,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014174444';
+const APP_VER='20261014175017';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
