@@ -204,7 +204,7 @@ function chipRow(f,fps,ri){
   const cr=ri!=null,refs=f.refs||[];
   const c=(x,on,l)=>`<div class="chip ${on?'on':''}" onclick="go('#/f/${x.id}')">${esc(l)}</div>`;
   let s='';
-  if(fps.length>1||refs.length)s+=`<div class="chips">${fps.map(x=>c(x,!cr&&x.id===f.id,x.name)).join('')}${refs.length?`<div class="chip ref ${cr?'on':''}" onclick="go('#/r/${f.id}/0')">도면코드 도면</div>`:''}</div>`;
+  if(fps.length>1||refs.length)s+=`<div class="chips">${fps.map(x=>c(x,!cr&&x.id===f.id,x.name)).join('')}${refs.length?`<div class="chip ref ${cr?'on':''}" onclick="go('#/r/${f.id}/0')">도면코드</div>`:''}</div>`;
   if(cr)s+=`<div class="chips">${refs.map((r,i)=>`<div class="chip ${i===ri?'on':''}" onclick="go('#/r/${f.id}/${i}')">${esc(r.name)}</div>`).join('')}</div>`;
   return s;
 }
