@@ -440,12 +440,21 @@ async function xlCompare(file){
   if(noB.size)err.unshift(`등록되지 않은 건물: ${[...noB].join(', ')} — 설정에서 건물을 먼저 등록하세요.`);
   if(!list.length&&!err.length)err.push('업로드할 자산이 없습니다.');
   if(err.length)return xlError(err);
-  const cur=D.a.filter(a=>a.status==='사용중'),cm=new Map(),used=new Set(),add=[],upd=[],tag=a=>`${esc(a.name)} <span class="muted">${esc(a.asset_no||'')}</span>`;
-  cur.forEach(a=>{const k=a.asset_no||`${a.name}|${a.drawing_code||''}`;if(!cm.has(k))cm.set(k,a)});
+  const cur=D.a.filter(a=>a.status==='사용중'),used=new Set(),add=[],upd=[],tag=a=>`${esc(a.name)} <span class="muted">${esc(a.asset_no||'')}</span>`,pair=new Map();
+  const link=(a,c)=>{pair.set(a,c);used.add(c.id)};
+  list.forEach(a=>{if(!a.asset_no)return;const c=cur.find(x=>!used.has(x.id)&&x.asset_no===a.asset_no);if(c)link(a,c)});
+  const byKey=(arr,f)=>{const m=new Map();arr.forEach(x=>{const k=f(x);m.set(k,[...(m.get(k)||[]),x])});return m};
+  const rest=()=>list.filter(a=>!pair.has(a)),free=()=>cur.filter(c=>!used.has(c.id));
+  const em=byKey(rest(),a=>a.name),cmN=byKey(free(),c=>c.name);
+  em.forEach((E,nm)=>{const C=cmN.get(nm)||[];if(!C.length)return;
+    if(E.length===1&&C.length===1)return link(E[0],C[0]);
+    const ec=byKey(E,a=>a.drawing_code),cc=byKey(C,c=>c.drawing_code||'');
+    ec.forEach((e2,code)=>{const c2=cc.get(code)||[];if(e2.length===1&&c2.length===1)link(e2[0],c2[0])})});
   let same=0;const upL=[];
   list.forEach(a=>{
-    const c=cm.get(a.k);if(!c){add.push(a);return}
-    used.add(c.id);const ch=[];
+    const c=pair.get(a);if(!c){add.push(a);return}
+    const ch=[];
+    if((c.asset_no||'')!==a.asset_no)ch.push(`자산번호 ${c.asset_no||'-'} → ${a.asset_no||'-'}`);
     if((c.zone_id||null)!==(a.zone_id||null))ch.push(`구역 ${zlabel(c.zone_id)||'미배정'} → ${zlabel(a.zone_id)||'미배정'}`);
     if((c.drawing_code||'')!==a.drawing_code)ch.push(`도면코드 ${c.drawing_code||'-'} → ${a.drawing_code||'-'}`);
     if(c.name!==a.name)ch.push(`자산명 ${c.name} → ${a.name}`);
@@ -695,7 +704,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014183320';
+const APP_VER='20261014184223';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
