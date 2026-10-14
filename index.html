@@ -74,7 +74,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e5483f;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .arow{display:grid;grid-template-columns:minmax(0,1fr) 214px;gap:8px;align-items:center}
 .ai{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;min-width:0;cursor:pointer;font-size:13px}
-.row.ar{margin:0 -16px;padding:10px 16px 10px 20px;box-shadow:inset 4px 0 0 var(--sc,transparent)}.ar.sc-ok{--sc:#00B050}.ar.sc-wn{--sc:#F59E0B}.ar.sc-er{--sc:#FF0000}.ar.sc-in{--sc:#185EA5}
+.row.ar{margin:0 -16px;padding:10px 16px 10px 20px;box-shadow:inset 4px 0 0 var(--sc,transparent)}.ar.sc-ok{--sc:#00B050}.ar.sc-wn{--sc:#F59E0B}.ar.sc-er{--sc:#FF0000}.ar.sc-in{--sc:#185EA5}.ar.sc-ex{--sc:#534AB7}
 .ah{padding-left:20px!important}
 .ai.n4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .ai>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -112,7 +112,7 @@ header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-widt
 const SB_URL='https://omqnuhrshddkoarbiiei.supabase.co';
 const SB_KEY='sb_publishable_xBcS0_fg1WGzDwn8JUNgew_p5GK40oc';
 const BUCKET='floorplans';
-const STATUS=['사용중','폐기','분실','처분'];
+const STATUS=['사용중','폐기','분실','처분','반출'];
 const SW=['','#185FA5','#0F6E56','#993C1D','#534AB7','#854F0B','#993556','#3B6D11','#5F5E5A'];
 const COLORS=['#378ADD','#1D9E75','#D85A30','#7F77DD','#BA7517','#D4537E','#639922','#888780'];
 const sb=supabase.createClient(SB_URL,SB_KEY);
@@ -304,7 +304,7 @@ function zoneOpts(except){
 }
 function openZone(zid){cur={t:'zone',id:zid};drawZone()}
 const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'미배정');
-const sc=a=>a.status==='분실'?' sc-er':a.status==='폐기'?' sc-in':a.status==='처분'?' sc-wn':!a.zone_id?' sc-ok':'';
+const sc=a=>a.status==='분실'?' sc-er':a.status==='폐기'?' sc-in':a.status==='반출'?' sc-ex':a.status==='처분'?' sc-wn':!a.zone_id?' sc-ok':'';
 const aCols=(a,lc=true)=>`${lc?`<span>${esc(zname(a))}</span>`:''}<span>${esc(a.drawing_code||'')}</span><span>${esc(a.asset_no||'')}</span><b>${esc(a.name)}</b><span>${esc(a.manager||'')}</span>`;
 let srt={k:null,d:1};
 const sval=(a,k)=>k==='loc'?zname(a):(a[k]||'');
@@ -358,6 +358,11 @@ async function setStatus(id){
   const by=byOf(v);
   await rpc('set_asset_status',{p_asset:id,p_status:v.s,p_by:by,p_note:v.note||null});await refresh();toast('상태를 변경했습니다.');
 }
+async function delAsset(id){
+  const a=byId(D.a,id);
+  const v=await ask(`'${a.name}' (${a.status}) 자산을 삭제할까요?`,[{k:'pw',label:'삭제 암호를 입력하세요. 자산과 변경 이력이 완전히 삭제되며 되돌릴 수 없습니다.',type:'password'},whoField()],'삭제');if(!v)return;
+  await rpc('delete_asset',{p_asset:id,p_password:v.pw});await refresh();toast('자산을 삭제했습니다.');
+}
 const zlabel=zid=>{const z=byId(D.z,zid),f=byId(D.f,z?.floorplan_id);return f?`${fpName(f)} / ${z.name}`:''};
 const assetFields=a=>[{k:'code',label:'도면코드',value:a?.drawing_code},{k:'asset_no',label:'자산번호',value:a?.asset_no},{k:'name',label:'자산명 *',value:a?.name},
   {k:'detail',label:'자산 상세위치',value:a?.detail_loc,ph:'예: 매표소 카운터 왼쪽'},{k:'manager',label:'관리자',value:a?.manager,ph:'이름'},{k:'note',label:'비고',value:a?.note}];
@@ -400,7 +405,7 @@ function drawPool(){
   const as=idle?[]:sortAssets(D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k))));
   const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색${idle?'':` · ${as.length}개`}</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
   <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
-  ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row ar${sc(a)}" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':'<button class="b3" data-as>구역 배정</button>'}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
+  ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row ar${sc(a)}" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':'<button class="b3" data-as>구역 배정</button>'}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button>${a.status!=='사용중'?'<button class="b3" data-del>삭제</button>':''}</span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
   bindSort(o);
   const qi=o.querySelector('#pq');
   qi.oninput=()=>{cur.qs=qi.value;clearTimeout(drawPool.t);drawPool.t=setTimeout(()=>{drawPool();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
@@ -411,6 +416,7 @@ function drawPool(){
     r.querySelector('[data-as]')?.addEventListener('click',()=>act(()=>assignAsset(id)));
     r.querySelector('[data-ed]').onclick=()=>act(()=>editAsset(id));
     r.querySelector('[data-hi]').onclick=()=>act(()=>showHist(id,r.querySelector('.hh')));
+    r.querySelector('[data-del]')?.addEventListener('click',()=>act(()=>delAsset(id)));
   });
 }
 async function assignAsset(id){
@@ -534,7 +540,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014175017';
+const APP_VER='20261014175227';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
