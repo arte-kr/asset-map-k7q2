@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>자산관리</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#141412">
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{--bg:#f4f3ee;--card:#fff;--tx:#1a1917;--mu:#4a4945;--hint:#888880;--bd:#e6e4dc;--soft:#f9f8f4;--tag:#f0ede6;--dark:#141412;--dark2:#1a1917;--gold:#FFC000;--dg:#FF0000;--r:7px}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Malgun Gothic','맑은 고딕',AppleGothic,-apple-system,sans-serif;background:var(--bg);color:var(--tx);font-size:13px}
+header{position:sticky;top:0;z-index:5;background:var(--dark);color:#fff;display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:2px solid var(--gold)}
+header h1{font-size:15px;margin:0;flex:1;font-weight:700;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+header button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:5px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer}
+header button:hover{background:rgba(255,255,255,.22)}
+main{max-width:1100px;margin:0 auto;padding:12px}
+button,select,input{font:inherit}
+input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radius:5px;background:#fff;color:var(--tx)}
+.b1,.b2,.b3{border-radius:5px;padding:8px 14px;border:1px solid var(--dark2);cursor:pointer;font-weight:600;font-size:12px}
+.b1{background:var(--dark2);color:#fff}.b1:hover{background:#2a2a27}
+.b2{background:#fff;color:var(--tx)}.b2:hover{background:var(--tag)}
+.b3{background:#fff;color:var(--tx);border-color:var(--bd);padding:5px 10px;font-weight:500}.b3:hover{background:var(--tag)}
+.b3.on{background:var(--dark2);color:#fff;border-color:var(--dark2)}
+.dg{color:var(--dg);border-color:var(--dg)}
+.muted{color:var(--hint);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px}
+.bcard{cursor:pointer;padding:0;overflow:hidden}.bcard:hover{border-color:var(--dark2)}
+.bcard b{display:block;background:var(--dark2);color:#fff;font-size:14px;padding:10px 16px}
+.bcard span{display:block;padding:12px 16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{padding:6px 13px;border-radius:5px;background:#fff;border:1px solid var(--bd);cursor:pointer;font-size:13px;font-weight:600}
+.chip.on{background:var(--dark2);border-color:var(--dark2);color:#fff}
+.tools{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.scroll{overflow:auto;background:#fff;border:1px solid var(--bd);border-radius:var(--r);max-height:72vh}
+.stage{position:relative;line-height:0}
+.stage img{width:100%;display:block;user-select:none;-webkit-user-drag:none}
+.stage svg{position:absolute;inset:0;width:100%;height:100%}
+.stage polygon{cursor:pointer;stroke-width:1.6;vector-effect:non-scaling-stroke}
+.ed svg{touch-action:none;cursor:crosshair}
+.lb{position:absolute;transform:translate(-50%,-50%);font-size:11px;line-height:1.25;text-align:center;pointer-events:none;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;font-weight:700;white-space:nowrap}
+.zl{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.zb{display:flex;align-items:center;gap:6px;padding:6px 11px;background:#fff;border:1px solid var(--bd);border-radius:5px;cursor:pointer;font-size:13px}
+.zb:hover{border-color:var(--dark2)}
+.zb i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.zb em{font-style:normal;color:var(--hint);font-size:12px}
+#ov,#ov2{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}
+#ov2{z-index:30}
+[hidden]{display:none!important}
+.box{background:#fff;border-radius:var(--r);width:100%;max-width:680px;margin:auto 0;overflow:hidden}
+.box.sm{max-width:380px}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;background:var(--dark2);color:#fff;gap:8px}
+.mh .muted{color:rgba(255,255,255,.6)}
+.mb{padding:14px 16px}
+.x{border:0;background:none;font-size:18px;color:#fff;cursor:pointer}
+.mb label{display:block;margin-bottom:10px;font-size:12px;color:var(--mu)}
+.mb label input,.mb label select{margin-top:4px;color:var(--tx);font-size:13px}
+.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.row{padding:10px 0;border-top:1px solid var(--bd)}
+.row:first-child{border-top:0}
+.rt{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.ra{display:flex;gap:6px;flex-wrap:wrap}
+.ra select{width:auto;flex:1;min-width:120px;padding:5px 8px;font-size:12px}
+.hist{margin-top:8px;font-size:12px;color:var(--mu);background:var(--soft);border:1px solid var(--bd);border-radius:5px;padding:8px 10px;line-height:1.7}
+.sec{margin-bottom:14px}
+.sec h2{font-size:13px;font-weight:700;margin:-14px -16px 12px;padding:9px 16px;background:var(--dark2);color:#fff;letter-spacing:.2px}
+.fr{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.fr>*{flex:1;min-width:130px}.fr>button{flex:0 0 auto}
+.li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--bd);flex-wrap:wrap}
+.li:first-of-type{border-top:0}.li>span{flex:1;min-width:120px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 16px;border-radius:5px;border-left:3px solid var(--gold);z-index:40;font-size:13px;max-width:90vw;display:none}
+#toast.er{background:var(--dg);border-left-color:#fff}
+.empty{text-align:center;color:var(--hint);padding:36px 12px}
+</style>
+</head>
+<body>
+<header id="top"></header>
+<main id="app"></main>
+<div id="ov" hidden></div>
+<div id="ov2" hidden></div>
+<div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
+<script>
+const SB_URL='https://omqnuhrshddkoarbiiei.supabase.co';
+const SB_KEY='sb_publishable_xBcS0_fg1WGzDwn8JUNgew_p5GK40oc';
+const BUCKET='floorplans';
+const STATUS=['사용중','폐기','분실','처분'];
+const COLORS=['#378ADD','#1D9E75','#D85A30','#7F77DD','#BA7517','#D4537E','#639922','#888780'];
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let D={b:[],f:[],z:[],a:[]};
+let cur=null;
+let zoom=1;
+const st={fpb:null,edf:null};
+let ed={zid:null,tool:'rect',pts:[],start:null};
+
+const byId=(arr,id)=>arr.find(x=>x.id===id);
+const zonesOf=fid=>D.z.filter(z=>z.floorplan_id===fid);
+const assetsIn=zid=>D.a.filter(a=>a.zone_id===zid);
+const fmt=t=>new Date(t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const imgUrl=p=>p?sb.storage.from(BUCKET).getPublicUrl(p).data.publicUrl:'';
+const fpName=f=>{const b=byId(D.b,f.building_id)?.name||'';return f.name===b?b:`${b} / ${f.name}`};
+const pts2s=p=>p.map(q=>q.x+','+q.y).join(' ');
+const center=p=>({x:p.reduce((s,q)=>s+q.x,0)/p.length,y:p.reduce((s,q)=>s+q.y,0)/p.length});
+
+function toast(m,err){const t=$('#toast');t.textContent=m;t.className=err?'er':'';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',err?5000:2500)}
+async function act(fn){try{await fn()}catch(e){toast(e.code==='23505'?(/code/.test(e.message)?'같은 도면코드가 이미 있습니다. 도면명이나 도면코드를 다르게 입력하세요.':'같은 이름이 이미 있습니다.'):(e.message||String(e)),true)}}
+async function rpc(fn,args){const{data,error}=await sb.rpc(fn,args);if(error)throw error;return data}
+async function q(p){const r=await p;if(r.error)throw r.error;return r.data}
+
+async function load(){
+  const s=t=>sb.from(t).select('*').order('created_at');
+  const r=await Promise.all([sb.from('buildings').select('*').order('sort').order('created_at'),sb.from('floorplans').select('*').order('sort').order('created_at'),s('zones'),s('assets')]);
+  for(const x of r)if(x.error)throw x.error;
+  [D.b,D.f,D.z,D.a]=r.map(x=>x.data);
+}
+
+function openOv(id,html){const o=$(id);o.hidden=false;o.innerHTML=html;return o}
+function closeModal(){$('#ov').hidden=true;$('#ov').innerHTML='';cur=null}
+function ask(title,fields=[],ok='확인'){
+  return new Promise(res=>{
+    const f=fields.map(x=>`<label>${esc(x.label)}${x.type==='select'
+      ?`<select name="${x.k}">${x.options.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('')}</select>`
+      :`<input name="${x.k}" type="${x.type||'text'}" value="${esc(x.value||'')}" placeholder="${esc(x.ph||'')}" autocomplete="off">`}</label>`).join('');
+    const o=openOv('#ov2',`<div class="box sm"><div class="mh"><b>${esc(title)}</b></div><form class="mb">${f}<div class="btns"><button type="button" class="b2" id="c">취소</button><button class="b1">${esc(ok)}</button></div></form></div>`);
+    const fm=o.querySelector('form');fm.querySelector('input,select')?.focus();
+    const done=v=>{o.hidden=true;o.innerHTML='';res(v)};
+    fm.onsubmit=e=>{e.preventDefault();done(Object.fromEntries(new FormData(fm)))};
+    o.querySelector('#c').onclick=()=>done(null);
+  });
+}
+const confirmBox=(m,ok)=>ask(m,[],ok).then(v=>v!==null);
+async function who(){
+  let n=localStorage.getItem('asset_user');
+  if(!n){const v=await ask('작업자 이름',[{k:'n',label:'변경 이력에 기록되며 이 기기에 저장됩니다.',ph:'홍길동'}]);if(!v||!v.n.trim())return null;n=v.n.trim();localStorage.setItem('asset_user',n)}
+  return n;
+}
+
+/* ---------- 라우팅 ---------- */
+function go(h){location.hash=h}
+window.addEventListener('hashchange',()=>{zoom=1;render()});
+async function render(){
+  const [,r,id]=location.hash.split('/');
+  const top=$('#top'),app=$('#app');
+  const gear='<button onclick="go(\'#/s\')">설정</button>',list='<button onclick="openPool()">자산 목록</button>';
+  if(r==='f'&&byId(D.f,id)){
+    const f=byId(D.f,id),b=byId(D.b,f.building_id);
+    top.innerHTML=`<button onclick="go('#/')">←</button><h1>${esc(b.name)}</h1>${list}${gear}`;
+    app.innerHTML=viewPlan(f,b);bindPlan(f);
+  }else if(r==='s'){
+    top.innerHTML=`<button onclick="go('#/')">←</button><h1>설정</h1>`;
+    if(ed.pts.length&&app.querySelector('#edst')){return}
+    app.innerHTML=await viewSettings();bindSettings();
+  }else{
+    top.innerHTML=`<h1>자산관리</h1>${list}${gear}`;
+    app.innerHTML=viewHome();
+  }
+}
+
+/* ---------- 홈 ---------- */
+function viewHome(){
+  if(!D.b.length)return `<div class="empty">등록된 건물이 없습니다.<br><br><button class="b1" onclick="go('#/s')">설정에서 건물 추가</button></div>`;
+  return `<div class="grid">${D.b.map(b=>{
+    const fps=D.f.filter(f=>f.building_id===b.id),zs=D.z.filter(z=>fps.some(f=>f.id===z.floorplan_id)),n=D.a.filter(a=>zs.some(z=>z.id===a.zone_id)).length;
+    return `<div class="card bcard" onclick="openBuilding('${b.id}')"><b>${esc(b.name)}</b><span class="muted">도면 ${fps.length}개 · 구역 ${zs.length}개 · 자산 ${n}개</span></div>`}).join('')}</div>`;
+}
+function openBuilding(id){
+  const f=D.f.find(x=>x.building_id===id&&x.image_path);
+  if(f)go('#/f/'+f.id);else toast('이 건물에 등록된 도면이 없습니다. 설정에서 도면을 올려주세요.',true);
+}
+
+/* ---------- 도면 보기 ---------- */
+function labels(zs){return zs.map(z=>{const c=center(z.points);return `<div class="lb" style="left:${c.x}%;top:${c.y}%">${esc(z.name)}<br>${assetsIn(z.id).length}</div>`}).join('')}
+function viewPlan(f,b){
+  const zs=zonesOf(f.id),fps=D.f.filter(x=>x.building_id===b.id);
+  return `${fps.length>1?`<div class="chips">${fps.map(x=>`<div class="chip ${x.id===f.id?'on':''}" onclick="go('#/f/${x.id}')">${esc(x.name)}</div>`).join('')}</div>`:''}
+  <div class="tools"><button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button><span class="muted">구역을 누르면 자산 목록이 열립니다 · 도면코드 ${esc(f.code)}</span></div>
+  <div class="scroll"><div class="stage" id="stage" style="width:${zoom*100}%"><img src="${imgUrl(f.image_path)}" alt="">
+  <svg viewBox="0 0 100 100" preserveAspectRatio="none">${zs.map(z=>`<polygon data-z="${z.id}" points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".35" stroke="${z.color}"/>`).join('')}</svg>${labels(zs)}</div></div>
+  <div class="zl">${zs.map(z=>`<div class="zb" data-z="${z.id}"><i style="background:${z.color}"></i>${esc(z.name)} <em>${assetsIn(z.id).length}</em></div>`).join('')||'<span class="muted">이 도면에는 구역이 없습니다. 설정에서 구역을 추가하세요.</span>'}</div>`;
+}
+function setZoom(d){zoom=Math.max(1,Math.min(4,zoom+d));const s=$('#stage');if(s)s.style.width=zoom*100+'%'}
+function bindPlan(){$('#app').querySelectorAll('[data-z]').forEach(e=>e.onclick=()=>openZone(e.dataset.z))}
+
+/* ---------- 구역 팝업 ---------- */
+function zoneOpts(except){
+  return D.b.map(b=>D.f.filter(f=>f.building_id===b.id).map(f=>{
+    const zs=zonesOf(f.id).filter(z=>z.id!==except);
+    return zs.length?`<optgroup label="${esc(b.name+' / '+f.name)}">${zs.map(z=>`<option value="${z.id}">${esc(z.name)}</option>`).join('')}</optgroup>`:''}).join('')).join('');
+}
+function openZone(zid){cur={t:'zone',id:zid};drawZone()}
+function assetRow(a,zid){
+  return `<div class="row" data-id="${a.id}"><div class="rt"><b>${esc(a.name)}</b><span class="muted">${esc([a.asset_no,a.manager&&'관리 '+a.manager].filter(Boolean).join(' · '))}</span>${a.note?`<span class="muted">${esc(a.note)}</span>`:''}</div>
+  <div class="ra"><select data-mv><option value="">구역 이동…</option>${zoneOpts(zid)}</select><select data-st><option value="">상태 변경…</option>${STATUS.slice(1).map(s=>`<option>${s}</option>`).join('')}</select><button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></div><div class="hist" hidden></div></div>`;
+}
+function drawZone(){
+  const z=byId(D.z,cur.id);if(!z){closeModal();return}
+  const f=byId(D.f,z.floorplan_id),as=assetsIn(z.id);
+  const o=openOv('#ov',`<div class="box"><div class="mh"><div><b>${esc(z.name)}</b><div class="muted">${esc(fpName(f))} · 도면코드 ${esc(f.code)} · 자산 ${as.length}개</div></div><button class="x" onclick="closeModal()">✕</button></div>
+  <div class="mb"><div class="btns" style="margin:0 0 6px"><button class="b1" data-add>＋ 자산 등록</button></div>${as.map(a=>assetRow(a,z.id)).join('')||'<div class="empty">이 구역에 자산이 없습니다.</div>'}</div></div>`);
+  bindAssets(o,z.id);
+}
+function bindAssets(o,zid){
+  o.querySelector('[data-add]')?.addEventListener('click',()=>addAsset(zid));
+  o.querySelectorAll('.row').forEach(r=>{
+    const id=r.dataset.id;
+    r.querySelector('[data-mv]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>moveAsset(id,v))});
+    r.querySelector('[data-st]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>setStatus(id,v))});
+    r.querySelector('[data-ed]')?.addEventListener('click',()=>act(()=>editAsset(id)));
+    r.querySelector('[data-hi]')?.addEventListener('click',()=>act(()=>showHist(id,r.querySelector('.hist'))));
+  });
+}
+async function moveAsset(id,zid){
+  const a=byId(D.a,id),z=byId(D.z,zid);
+  if(!await confirmBox(`'${a.name}'을(를) '${z.name}'(으)로 이동할까요?`,'이동'))return;
+  const by=await who();if(!by)return;
+  await rpc('move_asset',{p_asset:id,p_zone:zid,p_by:by});await refresh();toast('이동했습니다.');
+}
+async function setStatus(id,s){
+  const a=byId(D.a,id);
+  const v=await ask(`'${a.name}' 상태를 '${s}'(으)로 변경`,[{k:'note',label:'사유 (선택) — 구역 배정은 해제됩니다.'}],'변경');if(!v)return;
+  const by=await who();if(!by)return;
+  await rpc('set_asset_status',{p_asset:id,p_status:s,p_by:by,p_note:v.note||null});await refresh();toast('상태를 변경했습니다.');
+}
+const assetFields=a=>[{k:'name',label:'자산명 *',value:a?.name},{k:'asset_no',label:'자산번호',value:a?.asset_no},{k:'manager',label:'관리자',value:a?.manager},{k:'note',label:'비고',value:a?.note}];
+async function addAsset(zid){
+  const v=await ask('자산 등록',assetFields(),'등록');if(!v)return;
+  if(!v.name.trim())return toast('자산명을 입력하세요.',true);
+  const by=await who();if(!by)return;
+  await act(async()=>{
+    const a=await q(sb.from('assets').insert({name:v.name.trim(),asset_no:v.asset_no.trim()||null,manager:v.manager.trim()||null,note:v.note.trim()||null,zone_id:zid}).select().single());
+    await q(sb.from('asset_history').insert({asset_id:a.id,action:'등록',to_zone_name:byId(D.z,zid)?.name,changed_by:by}));
+    await refresh();toast('자산을 등록했습니다.');
+  });
+}
+async function editAsset(id){
+  const a=byId(D.a,id),v=await ask('자산 수정',assetFields(a),'저장');if(!v)return;
+  if(!v.name.trim())throw new Error('자산명을 입력하세요.');
+  await q(sb.from('assets').update({name:v.name.trim(),asset_no:v.asset_no.trim()||null,manager:v.manager.trim()||null,note:v.note.trim()||null,updated_at:new Date().toISOString()}).eq('id',id));
+  await refresh();toast('저장했습니다.');
+}
+async function showHist(id,el){
+  if(!el.hidden){el.hidden=true;return}
+  const h=await q(sb.from('asset_history').select('*').eq('asset_id',id).order('created_at',{ascending:false}).limit(30));
+  el.innerHTML=h.map(x=>{
+    const mv=x.action==='이동'||x.action==='구역삭제'?` ${esc(x.from_zone_name||'미배정')} → ${esc(x.to_zone_name||'미배정')}`:x.action==='상태변경'?` ${esc(x.from_status)} → ${esc(x.to_status)}`:x.to_zone_name?' '+esc(x.to_zone_name):'';
+    return `${fmt(x.created_at)} · <b>${esc(x.action)}</b>${mv} · ${esc(x.changed_by||'')}${x.note?' · '+esc(x.note):''}`}).join('<br>')||'이력이 없습니다.';
+  el.hidden=false;
+}
+
+/* ---------- 자산 목록 (검색 / 미배정·종료) ---------- */
+function openPool(){cur={t:'pool',qs:'',f:'all'};drawPool()}
+function loc(a){
+  const z=byId(D.z,a.zone_id);if(!z)return a.status==='사용중'?'미배정':a.status;
+  return fpName(byId(D.f,z.floorplan_id))+' / '+z.name;
+}
+function drawPool(){
+  const k=cur.qs.trim().toLowerCase();
+  const as=D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.asset_no,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k)));
+  const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 목록 · ${as.length}개</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
+  <div class="fr"><input id="pq" placeholder="자산명·번호·관리자·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
+  ${as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="rt"><b>${esc(a.name)}</b><span class="muted">${esc([a.asset_no,a.manager&&'관리 '+a.manager].filter(Boolean).join(' · '))}</span><span class="muted">위치: ${esc(loc(a))}${a.zone_id?'':` · 상태: ${esc(a.status)}`}</span></div>
+  <div class="ra">${a.zone_id?`<button class="b3" data-go>구역 열기</button>`:`<select data-as><option value="">구역 배정…</option>${zoneOpts()}</select>`}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></div><div class="hist" hidden></div></div>`).join('')||'<div class="empty">해당하는 자산이 없습니다.</div>'}</div></div>`);
+  const qi=o.querySelector('#pq');
+  qi.oninput=()=>{cur.qs=qi.value;clearTimeout(drawPool.t);drawPool.t=setTimeout(()=>{drawPool();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
+  o.querySelector('#pf').onchange=e=>{cur.f=e.target.value;drawPool()};
+  o.querySelectorAll('.row').forEach(r=>{
+    const id=r.dataset.id,a=byId(D.a,id);
+    r.querySelector('[data-go]')?.addEventListener('click',()=>openZone(a.zone_id));
+    r.querySelector('[data-as]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>assignAsset(id,v))});
+    r.querySelector('[data-ed]').onclick=()=>act(()=>editAsset(id));
+    r.querySelector('[data-hi]').onclick=()=>act(()=>showHist(id,r.querySelector('.hist')));
+  });
+}
+async function assignAsset(id,zid){
+  const a=byId(D.a,id),z=byId(D.z,zid);
+  if(!await confirmBox(`'${a.name}'을(를) '${z.name}'에 배정할까요?`+(a.status!=='사용중'?` (상태가 '${a.status}'에서 '사용중'으로 바뀝니다)`:''),'배정'))return;
+  const by=await who();if(!by)return;
+  if(a.status!=='사용중')await rpc('set_asset_status',{p_asset:id,p_status:'사용중',p_by:by,p_note:'구역 재배정'});
+  await rpc('move_asset',{p_asset:id,p_zone:zid,p_by:by});await refresh();toast('배정했습니다.');
+}
+
+/* ---------- 설정 ---------- */
+async function viewSettings(){
+  const has=await rpc('has_delete_password');
+  const fpb=st.fpb&&byId(D.b,st.fpb)?st.fpb:D.b[0]?.id;st.fpb=fpb;
+  const fps=D.f.filter(f=>f.building_id===fpb);
+  const edf=st.edf&&byId(D.f,st.edf)?st.edf:D.f[0]?.id;st.edf=edf;
+  const zs=edf?zonesOf(edf):[];
+  const user=localStorage.getItem('asset_user')||'';
+  return `
+  <div class="card sec"><h2>작업자 이름</h2><div class="fr"><input id="un" value="${esc(user)}" placeholder="변경 이력에 기록될 이름"><button class="b2" id="unb">저장</button></div></div>
+  <div class="card sec"><h2>건물</h2>${D.b.map(b=>`<div class="li"><span>${esc(b.name)}</span><button class="b3" data-bren="${b.id}">이름 변경</button><button class="b3 dg" data-bdel="${b.id}">삭제</button></div>`).join('')||'<div class="muted">등록된 건물이 없습니다.</div>'}
+  <div class="fr" style="margin-top:10px"><input id="bn" placeholder="새 건물 이름"><button class="b1" id="bad">건물 추가</button></div></div>
+  <div class="card sec"><h2>도면</h2>
+  ${D.b.length?`<select id="fpb" style="margin-bottom:8px">${D.b.map(b=>`<option value="${b.id}" ${b.id===fpb?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
+  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${esc(f.code)} ${f.image_path?'':'· 이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><button class="b3" data-fren="${f.id}">이름·코드</button><button class="b3 dg" data-fdel="${f.id}">삭제</button></div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
+  <div style="margin-top:12px" class="muted">도면 추가</div>
+  <div class="fr"><input id="fn" placeholder="도면명 (선택 · 비우면 건물명 사용)"><input id="fc" placeholder="도면코드 (선택 · 비우면 도면명 사용)"></div>
+  <div class="fr"><input id="ff" type="file" accept="image/*"><button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
+  <div class="card sec"><h2>구역</h2>
+  ${D.f.length?`<select id="edf" style="margin-bottom:8px">${D.f.map(f=>`<option value="${f.id}" ${f.id===edf?'selected':''}>${esc(fpName(f))}</option>`).join('')}</select>
+  <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">사각형</button><button class="b3 ${ed.tool==='poly'?'on':''}" id="tpoly">다각형</button><button class="b3" id="tundo">마지막 점 취소</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.tool==='rect'?'도면 위를 드래그하세요':'꼭짓점을 차례로 누르세요 (3개 이상)'}</span></div>
+  <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(byId(D.f,edf)?.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div></div></div>
+  <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">${ed.zid?'수정 저장':'구역 추가'}</button>${ed.zid?'<button class="b2" id="znew">취소</button>':''}</div>
+  ${zs.map(z=>`<div class="li"><span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${z.color}"></i> ${esc(z.name)} <span class="muted">자산 ${assetsIn(z.id).length}</span></span><button class="b3" data-zed="${z.id}">수정</button><button class="b3 dg" data-zdel="${z.id}">삭제</button></div>`).join('')}`:'<div class="muted">먼저 도면을 추가하세요.</div>'}</div>
+  <div class="card sec"><h2>삭제 암호</h2><div class="muted" style="margin-bottom:8px">자산이 있는 구역을 삭제할 때 필요합니다. ${has?'암호가 설정되어 있습니다.':'<b style="color:var(--dg)">아직 설정되지 않았습니다.</b>'}</div>
+  <div class="fr">${has?'<input id="pwo" type="password" placeholder="기존 암호">':''}<input id="pwn" type="password" placeholder="새 암호 (4자 이상)"><button class="b1" id="pwb">${has?'암호 변경':'암호 설정'}</button></div></div>`;
+}
+function bindSettings(){
+  const A=$('#app'),on=(s,fn)=>{const e=A.querySelector(s);if(e)e.onclick=()=>act(fn)};
+  on('#unb',async()=>{const v=$('#un').value.trim();if(!v)throw new Error('이름을 입력하세요.');localStorage.setItem('asset_user',v);toast('저장했습니다.')});
+  on('#bad',async()=>{const n=$('#bn').value.trim();if(!n)throw new Error('건물 이름을 입력하세요.');await q(sb.from('buildings').insert({name:n,sort:D.b.length+1}));await refresh()});
+  A.querySelectorAll('[data-bren]').forEach(e=>e.onclick=()=>act(async()=>{const b=byId(D.b,e.dataset.bren),v=await ask('건물 이름 변경',[{k:'n',label:'이름',value:b.name}]);if(!v||!v.n.trim())return;await q(sb.from('buildings').update({name:v.n.trim()}).eq('id',b.id));await refresh()}));
+  A.querySelectorAll('[data-bdel]').forEach(e=>e.onclick=()=>act(async()=>{const b=byId(D.b,e.dataset.bdel);if(D.f.some(f=>f.building_id===b.id))throw new Error('도면이 있는 건물은 삭제할 수 없습니다. 도면을 먼저 삭제하세요.');if(!await confirmBox(`건물 '${b.name}'을(를) 삭제할까요?`,'삭제'))return;await q(sb.from('buildings').delete().eq('id',b.id));await refresh()}));
+  A.querySelector('#fpb')?.addEventListener('change',e=>{st.fpb=e.target.value;render()});
+  on('#fad',async()=>{
+    const file=$('#ff').files[0];
+    if(!file)throw new Error('도면 이미지 파일을 선택하세요.');
+    const name=$('#fn').value.trim()||byId(D.b,st.fpb).name,code=$('#fc').value.trim()||name;
+    const path=await upload(file,code);
+    await q(sb.from('floorplans').insert({building_id:st.fpb,code,name,image_path:path,sort:D.f.length+1}));await refresh();toast('도면을 추가했습니다.');
+  });
+  A.querySelectorAll('[data-fimg]').forEach(e=>e.onchange=()=>act(async()=>{const f=byId(D.f,e.dataset.fimg),file=e.files[0];if(!file)return;const path=await upload(file,f.code);await q(sb.from('floorplans').update({image_path:path}).eq('id',f.id));await refresh();toast('이미지를 교체했습니다.')}));
+  A.querySelectorAll('[data-fren]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fren),v=await ask('도면 이름·코드',[{k:'name',label:'도면명',value:f.name},{k:'code',label:'도면코드',value:f.code}]);if(!v||!v.name.trim())return;await q(sb.from('floorplans').update({name:v.name.trim(),code:v.code.trim()||v.name.trim()}).eq('id',f.id));await refresh()}));
+  A.querySelectorAll('[data-fdel]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fdel);if(zonesOf(f.id).length)throw new Error('구역이 있는 도면은 삭제할 수 없습니다. 구역을 먼저 삭제하세요.');if(!await confirmBox(`도면 '${f.name}'을(를) 삭제할까요?`,'삭제'))return;await q(sb.from('floorplans').delete().eq('id',f.id));await refresh()}));
+  A.querySelector('#edf')?.addEventListener('change',e=>{st.edf=e.target.value;resetEd();render()});
+  bindEditor();
+  on('#pwb',async()=>{await rpc('set_delete_password',{p_new:$('#pwn').value,p_old:$('#pwo')?.value||null});toast('삭제 암호를 저장했습니다.');render()});
+}
+async function upload(file,code){
+  const ext=(file.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const path=`${code.replace(/[^A-Za-z0-9_-]/g,'_')||'plan'}_${Date.now()}.${ext}`;
+  const{error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type||'image/png'});
+  if(error)throw error;return path;
+}
+
+/* ---------- 구역 그리기 ---------- */
+function resetEd(){ed={zid:null,tool:ed.tool,pts:[],start:null}}
+const rectPts=(a,b)=>[{x:a.x,y:a.y},{x:b.x,y:a.y},{x:b.x,y:b.y},{x:a.x,y:b.y}];
+function drawEd(){
+  const sv=$('#edsv');if(!sv)return;
+  const others=zonesOf(st.edf).filter(z=>z.id!==ed.zid);
+  const col=$('#zc')?.value||COLORS[0];
+  sv.innerHTML=others.map(z=>`<polygon points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".25" stroke="${z.color}" style="cursor:crosshair"/>`).join('')
+    +(ed.pts.length>1?`<polygon points="${pts2s(ed.pts)}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-dasharray="3 2" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`:'')
+    +ed.pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r=".8" fill="#fff" stroke="${col}" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`).join('');
+  $('#edlb').innerHTML=labels(others);
+}
+function bindEditor(){
+  const sv=$('#edsv');if(!sv)return;
+  const pct=e=>{const r=sv.getBoundingClientRect();const c=v=>+Math.min(100,Math.max(0,v)).toFixed(2);return{x:c((e.clientX-r.left)/r.width*100),y:c((e.clientY-r.top)/r.height*100)}};
+  sv.onpointerdown=e=>{e.preventDefault();if(ed.tool==='rect'){ed.start=pct(e);ed.pts=rectPts(ed.start,ed.start);sv.setPointerCapture(e.pointerId)}else ed.pts.push(pct(e));drawEd()};
+  sv.onpointermove=e=>{if(ed.tool==='rect'&&ed.start){ed.pts=rectPts(ed.start,pct(e));drawEd()}};
+  sv.onpointerup=()=>{if(ed.tool==='rect'&&ed.start){const p=ed.pts;ed.start=null;if(Math.abs(p[2].x-p[0].x)<1||Math.abs(p[2].y-p[0].y)<1)ed.pts=[];drawEd()}};
+  const tool=t=>{ed.tool=t;ed.pts=[];ed.start=null;render()};
+  $('#trect').onclick=()=>tool('rect');$('#tpoly').onclick=()=>tool('poly');
+  $('#tundo').onclick=()=>{ed.pts.pop();drawEd()};$('#tclr').onclick=()=>{ed.pts=[];drawEd()};
+  $('#zc').onchange=drawEd;
+  const z=ed.zid&&byId(D.z,ed.zid);
+  if(z){$('#zn').value=z.name;$('#zc').value=z.color}
+  $('#znew')?.addEventListener('click',()=>{resetEd();render()});
+  $('#zsv').onclick=()=>act(async()=>{
+    const name=$('#zn').value.trim();
+    if(!name)throw new Error('구역 이름을 입력하세요.');
+    if(ed.pts.length<3)throw new Error('도면 위에 구역 모양을 먼저 그리세요.');
+    const row={name,color:$('#zc').value,points:ed.pts};
+    if(ed.zid)await q(sb.from('zones').update(row).eq('id',ed.zid));
+    else await q(sb.from('zones').insert({...row,floorplan_id:st.edf}));
+    resetEd();await refresh();toast('구역을 저장했습니다.');
+  });
+  $('#app').querySelectorAll('[data-zed]').forEach(e=>e.onclick=()=>{const z=byId(D.z,e.dataset.zed);ed.zid=z.id;ed.pts=z.points.map(p=>({...p}));render()});
+  $('#app').querySelectorAll('[data-zdel]').forEach(e=>e.onclick=()=>act(()=>delZone(e.dataset.zdel)));
+  drawEd();
+}
+async function delZone(id){
+  const z=byId(D.z,id),n=assetsIn(id).length;let pw=null;
+  if(n>0){
+    const v=await ask(`'${z.name}' 구역에 자산 ${n}개가 있습니다`,[{k:'pw',label:'삭제 암호를 입력하세요. 구역만 삭제되고 자산은 미배정으로 남습니다.',type:'password'}],'삭제');
+    if(!v)return;pw=v.pw;
+  }else if(!await confirmBox(`구역 '${z.name}'을(를) 삭제할까요?`,'삭제'))return;
+  const by=await who();if(!by)return;
+  const c=await rpc('delete_zone',{p_zone:id,p_password:pw,p_by:by});
+  if(ed.zid===id)resetEd();
+  await refresh();toast(c>0?`구역을 삭제했습니다. 자산 ${c}개는 미배정입니다.`:'구역을 삭제했습니다.');
+}
+
+/* ---------- 시작 ---------- */
+async function refresh(){
+  await load();
+  if(cur?.t==='zone')drawZone();else if(cur?.t==='pool')drawPool();
+  await render();
+}
+let rt;
+function live(){
+  sb.channel('asset-live').on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rt);rt=setTimeout(()=>act(refresh),400)}).subscribe();
+}
+(async()=>{
+  try{await load();await render();live()}
+  catch(e){$('#app').innerHTML=`<div class="empty">데이터를 불러오지 못했습니다.<br>${esc(e.message||e)}</div>`}
+})();
+</script>
+</body>
+</html>
