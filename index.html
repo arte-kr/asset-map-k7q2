@@ -70,9 +70,10 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 :root[data-theme=dark] .notice{background:#332f1f;color:#f1d98a;border-color:#5a5030}
 header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e5483f;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .arow{display:grid;grid-template-columns:minmax(0,1fr) 214px;gap:8px;align-items:center}
-.ai{display:grid;grid-template-columns:1fr 1fr 1.6fr 1fr 1fr;gap:8px;min-width:0;cursor:pointer;font-size:13px}
+.ai{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;min-width:0;cursor:pointer;font-size:13px}
+.ai.n4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .ai>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.ah{padding:0 0 6px;color:var(--tx);border-bottom:1px solid var(--bd)}.ah .ai{cursor:default;font-size:13px;font-weight:700}
+.ah{margin:0 -16px;padding:9px 16px;background:var(--tag);color:var(--tx);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd)}.ah .ai{cursor:default;font-size:13px;font-weight:700}
 .ba{display:flex;gap:4px;justify-content:flex-end;align-items:center}.ba select{width:96px;padding:5px 6px;font-size:12px}
 @media(max-width:640px){.arow{grid-template-columns:minmax(0,1fr)}.ba{justify-content:flex-start}.ah .ba{display:none}}
 .row{padding:10px 0;border-top:1px solid var(--bd)}
@@ -259,17 +260,17 @@ function zoneOpts(except){
 }
 function openZone(zid){cur={t:'zone',id:zid};drawZone()}
 const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'미배정');
-const aCols=a=>`<span>${esc(a.drawing_code||'')}</span><span>${esc(a.asset_no||'')}</span><b>${esc(a.name)}</b><span>${esc(zname(a))}</span><span>${esc(a.manager||'')}</span>`;
-const aHead='<div class="arow ah"><div class="ai"><span>도면코드</span><span>자산번호</span><span>자산명</span><span>위치</span><span>관리자</span></div><span class="ba"></span></div>';
+const aCols=(a,lc=true)=>`${lc?`<span>${esc(zname(a))}</span>`:''}<span>${esc(a.drawing_code||'')}</span><span>${esc(a.asset_no||'')}</span><b>${esc(a.name)}</b><span>${esc(a.manager||'')}</span>`;
+const aHead=(lc=true)=>`<div class="arow ah"><div class="ai${lc?'':' n4'}">${lc?'<span>위치</span>':''}<span>도면코드</span><span>자산번호</span><span>자산명</span><span>관리자</span></div><span class="ba"></span></div>`;
 const aDetail=a=>[a.detail_loc&&`상세위치 ${a.detail_loc}`,a.note&&`비고 ${a.note}`].filter(Boolean).join(' · ')||'등록된 상세 정보가 없습니다.';
 function assetRow(a){
-  return `<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba"><button class="b3" data-mv>이동</button><button class="b3" data-st>상태</button><button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`;
+  return `<div class="row" data-id="${a.id}"><div class="arow"><div class="ai n4" data-info title="눌러서 상세 보기">${aCols(a,false)}</div><span class="ba"><button class="b3" data-mv>이동</button><button class="b3" data-st>상태</button><button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`;
 }
 function drawZone(){
   const z=byId(D.z,cur.id);if(!z){closeModal();return}
   const f=byId(D.f,z.floorplan_id),as=assetsIn(z.id);
   const o=openOv('#ov',`<div class="box"><div class="mh"><div><b>${esc(z.name)}</b><div class="muted">${esc(fpName(f))} · 자산 ${as.length}개</div></div><button class="x" onclick="closeModal()">✕</button></div>
-  <div class="mb"><div class="btns" style="margin:0 0 6px"><button class="b1" data-add>＋ 자산 등록</button></div>${as.length?aHead+as.map(assetRow).join(''):'<div class="empty">이 구역에 자산이 없습니다.</div>'}</div></div>`);
+  <div class="mb"><div class="btns" style="margin:0 0 6px"><button class="b1" data-add>＋ 자산 등록</button></div>${as.length?aHead(false)+as.map(assetRow).join(''):'<div class="empty">이 구역에 자산이 없습니다.</div>'}</div></div>`);
   bindAssets(o,z.id);
 }
 function bindInfo(r,a){r.querySelector('[data-info]').onclick=()=>{const d=r.querySelector('.det');d.hidden=!d.hidden;if(!d.hidden)d.textContent=aDetail(a)}}
@@ -339,7 +340,7 @@ function drawPool(){
   const as=idle?[]:D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k)));
   const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색${idle?'':` · ${as.length}개`}</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
   <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
-  ${as.length?aHead+as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':`<select data-as><option value="">구역 배정…</option>${zoneOpts()}</select>`}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
+  ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':`<select data-as><option value="">구역 배정…</option>${zoneOpts()}</select>`}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
   const qi=o.querySelector('#pq');
   qi.oninput=()=>{cur.qs=qi.value;clearTimeout(drawPool.t);drawPool.t=setTimeout(()=>{drawPool();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
   o.querySelector('#pf').onchange=e=>{cur.f=e.target.value;drawPool()};
