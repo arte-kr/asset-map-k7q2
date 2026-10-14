@@ -402,15 +402,22 @@ function histLine(x){
 async function viewReport(){
   const tab=st.rp||'chg';
   const all=await q(sb.from('asset_history').select('*').order('created_at',{ascending:false}).limit(500));
-  const gone=new Set(all.filter(x=>x.action==='삭제').map(x=>x.asset_id));
+  const live=new Set(D.a.map(a=>a.id)),seen=new Set(),dels=all.filter(x=>x.action==='삭제'&&!live.has(x.asset_id)&&!seen.has(x.asset_id)&&seen.add(x.asset_id));
+  const gone=seen;
   const nm=x=>`<b>${esc(x.asset_name||'(이름 없음)')}</b> <span class="muted">${esc(x.asset_no||'')}</span>`;
   const body=tab==='del'
-    ?all.filter(x=>x.action==='삭제').map(x=>`<div class="li"><span>${nm(x)} <span class="muted">${esc(x.from_status||'')} · ${esc(x.changed_by||'')} · ${fmt(x.created_at)}</span></span><button class="b3" data-dh="${x.asset_id}">이력</button></div><div class="hist" hidden data-dhe="${x.asset_id}"></div>`).join('')||'<div class="muted">삭제된 자산이 없습니다.</div>'
+    ?dels.map(x=>`<div class="li"><span>${nm(x)} <span class="muted">${esc(x.from_status||'')} · ${esc(x.changed_by||'')} · ${fmt(x.created_at)}</span></span><span class="ba" style="flex:none"><button class="b3" data-rs="${x.asset_id}">복원</button><button class="b3" data-dh="${x.asset_id}">이력</button></span></div><div class="hist" hidden data-dhe="${x.asset_id}"></div>`).join('')||'<div class="muted">삭제된 자산이 없습니다.</div>'
     :all.filter(x=>!gone.has(x.asset_id)).slice(0,200).map(x=>`<div class="li" style="display:block">${nm(x)}<div class="muted">${histLine(x)}</div></div>`).join('')||'<div class="muted">변경 이력이 없습니다.</div>';
   return `<div class="card sec"><div class="chips"><div class="chip ${tab==='chg'?'on':''}" data-rp="chg">변경이력</div><div class="chip ${tab==='del'?'on':''}" data-rp="del">삭제이력</div></div>${body}</div>`;
 }
+async function restoreAsset(id){
+  const x=await q(sb.from('asset_history').select('asset_name').eq('asset_id',id).eq('action','삭제').limit(1));
+  const v=await ask(`'${x[0]?.asset_name||''}' 자산을 복원할까요?`,[{k:'info',label:'이전 구역으로 돌아가지 않고 유휴(미배정) 상태로 복원됩니다. 복원 후 구역을 다시 배정하세요.',type:'hidden'},whoField()],'복원');if(!v)return;
+  await rpc('restore_asset',{p_asset:id,p_by:byOf(v)});await refresh();render();toast('유휴 상태로 복원했습니다. 구역을 다시 배정하세요.');
+}
 function bindReport(){
   const A=$('#app');
+  A.querySelectorAll('[data-rs]').forEach(e=>e.onclick=()=>act(()=>restoreAsset(e.dataset.rs)));
   A.querySelectorAll('[data-rp]').forEach(e=>e.onclick=()=>{st.rp=e.dataset.rp;render()});
   A.querySelectorAll('[data-dh]').forEach(e=>e.onclick=()=>act(()=>showHist(e.dataset.dh,A.querySelector(`[data-dhe="${e.dataset.dh}"]`))));
 }
@@ -563,7 +570,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014181121';
+const APP_VER='20261014181249';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
