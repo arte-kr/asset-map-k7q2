@@ -396,7 +396,7 @@ async function viewSettings(){
   <div class="fr" style="margin-top:10px"><input id="bn" placeholder="새 건물 이름"><button class="b1" id="bad">건물 추가</button></div></div>
   <div class="card sec"><h2>도면</h2>
   ${D.b.length?`<div class="chips">${D.b.map(b=>`<div class="chip ${b.id===fpb?'on':''}" data-fpb="${b.id}">${esc(b.name)}</div>`).join('')}</div>
-  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${f.image_path?'':'이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><label class="b3" style="margin:0;cursor:pointer">도면코드 도면 추가<input type="file" accept="image/*,application/pdf" multiple hidden data-fref="${f.id}"></label><button class="b3 dg" data-fdel="${f.id}">삭제</button>${(f.refs||[]).length?`<div class="muted" style="flex-basis:100%">도면코드 도면: ${(f.refs||[]).map((r,i)=>`${esc(r.name)} <u data-rdel="${f.id}:${i}" style="cursor:pointer;color:var(--dg)">삭제</u>`).join(' · ')}</div>`:''}</div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
+  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${f.image_path?'':'이미지 없음'}</span></span><button class="b3" data-fren="${f.id}">이름 변경</button><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><label class="b3" style="margin:0;cursor:pointer">도면코드 도면 추가<input type="file" accept="image/*,application/pdf" multiple hidden data-fref="${f.id}"></label><button class="b3 dg" data-fdel="${f.id}">삭제</button>${(f.refs||[]).length?`<div class="muted" style="flex-basis:100%">도면코드 도면: ${(f.refs||[]).map((r,i)=>`${esc(r.name)} <u data-rdel="${f.id}:${i}" style="cursor:pointer;color:var(--dg)">삭제</u>`).join(' · ')}</div>`:''}</div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
   <div style="margin-top:12px" class="muted">도면 추가</div>
   <label class="muted" style="display:block;margin-bottom:6px">일반 도면 (필수)<input id="ff" type="file" accept="image/*" style="margin-top:4px"></label>
   <label class="muted" style="display:block;margin-bottom:8px">도면코드 도면 (선택 · PDF 또는 이미지, 여러 개 가능)<input id="fr" type="file" accept="image/*,application/pdf" multiple style="margin-top:4px"></label>
@@ -432,6 +432,7 @@ function bindSettings(){
   A.querySelectorAll('[data-fimg]').forEach(e=>e.onchange=()=>act(async()=>{const f=byId(D.f,e.dataset.fimg),file=e.files[0];if(!file)return;const path=await upload(file,f.code);await q(sb.from('floorplans').update({image_path:path}).eq('id',f.id));await refresh();toast('이미지를 교체했습니다.')}));
   A.querySelectorAll('[data-fref]').forEach(e=>e.onchange=()=>act(async()=>{const f=byId(D.f,e.dataset.fref),fl=[...e.files];if(!fl.length)return;const add=[];for(const x of fl)add.push({name:x.name.replace(/\.[^.]+$/,''),path:await upload(x,f.code+'_ref')});await q(sb.from('floorplans').update({refs:[...(f.refs||[]),...add]}).eq('id',f.id));await refresh();toast('도면코드 도면을 추가했습니다.')}));
   A.querySelectorAll('[data-rdel]').forEach(e=>e.onclick=()=>act(async()=>{const[fid,i]=e.dataset.rdel.split(':'),f=byId(D.f,fid),r=(f.refs||[])[+i];if(!await confirmBox(`도면코드 도면 '${r.name}'을(를) 목록에서 삭제할까요?`,'삭제'))return;await q(sb.from('floorplans').update({refs:f.refs.filter((_,k)=>k!==+i)}).eq('id',f.id));await refresh()}));
+  A.querySelectorAll('[data-fren]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fren),v=await ask('도면 이름 변경',[{k:'name',label:'도면명 (도면 화면 위쪽 버튼에 표시됩니다)',value:f.name}]);if(!v||!v.name.trim())return;await q(sb.from('floorplans').update({name:v.name.trim()}).eq('id',f.id));await refresh();toast('이름을 변경했습니다.')}));
   A.querySelectorAll('[data-fdel]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fdel);if(zonesOf(f.id).length)throw new Error('구역이 있는 도면은 삭제할 수 없습니다. 구역을 먼저 삭제하세요.');if(!await confirmBox(`도면 '${f.name}'을(를) 삭제할까요?`,'삭제'))return;await q(sb.from('floorplans').delete().eq('id',f.id));await refresh()}));
   A.querySelectorAll('[data-edb]').forEach(e=>e.onclick=()=>{st.edf=D.f.find(f=>f.building_id===e.dataset.edb)?.id;resetEd();render()});
   A.querySelectorAll('[data-edf]').forEach(e=>e.onclick=()=>{st.edf=e.dataset.edf;resetEd();render()});
@@ -496,7 +497,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014173455';
+const APP_VER='20261014173646';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
