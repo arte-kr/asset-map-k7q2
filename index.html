@@ -69,6 +69,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .mb label{display:block;margin-bottom:10px;font-size:12px;color:var(--mu)}
 .mb label input,.mb label select{margin-top:4px;color:var(--tx);font-size:13px}
 .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.sbs{display:flex;gap:8px;flex-wrap:wrap}.sb{display:flex;align-items:center;gap:8px;border:1px solid var(--bd);border-radius:var(--r);padding:6px 10px;font-size:13px;cursor:pointer}.sb i{width:4px;height:16px;background:var(--sc)}.sb b{font-weight:700}.sb.sc-ok{--sc:#00B050}.sb.sc-wn{--sc:#F59E0B}.sb.sc-er{--sc:#FF0000}.sb.sc-in{--sc:#185EA5}.sb.sc-ex{--sc:#534AB7}
 .notice{background:#fff3cd;color:#664d03;border:1px solid #ffe69c;border-radius:var(--r);padding:10px 14px;margin-bottom:12px;cursor:pointer;font-size:13px}
 :root[data-theme=dark] .notice{background:#332f1f;color:#f1d98a;border-color:#5a5030}
 header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e5483f;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -222,8 +223,8 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>fitChips()
 /* ---------- 홈 ---------- */
 function viewHome(){
   if(!D.b.length)return `<div class="empty">등록된 건물이 없습니다.<br><br><button class="b1" onclick="go('#/s')">설정에서 건물 추가</button></div>`;
-  const n=unCount();
-  return `${n?`<div class="notice" onclick="openPool('un')"><b>미배정 자산 ${n}개</b>가 있습니다. 자산 배정을 완료해 주세요.</div>`:''}<div class="grid">${D.b.map(b=>`<div class="bcard" style="${b.color?`background:${b.color}`:''}" onclick="openBuilding('${b.id}')">${esc(b.name)}</div>`).join('')}</div>`;
+  const cnt=[['유휴','ok',unCount()],...[['처분','wn'],['분실','er'],['폐기','in'],['반출','ex']].map(([v,c])=>[v,c,D.a.filter(x=>x.status===v).length])].filter(x=>x[2]);
+  return `<div class="grid">${D.b.map(b=>`<div class="bcard" style="${b.color?`background:${b.color}`:''}" onclick="openBuilding('${b.id}')">${esc(b.name)}</div>`).join('')}</div>${cnt.length?`<div class="muted" style="margin:14px 0 6px">상태 자산</div><div class="sbs">${cnt.map(([l,c,n])=>`<div class="sb sc-${c}" onclick="openPool('${l}')"><i></i>${l}<b>${n}</b></div>`).join('')}</div>`:''}`;
 }
 function openBuilding(id){
   const f=D.f.find(x=>x.building_id===id&&x.image_path);
@@ -303,7 +304,7 @@ function zoneOpts(except){
     return zs.length?`<optgroup label="${esc(b.name+' / '+f.name)}">${zs.map(z=>`<option value="${z.id}">${esc(z.name)}</option>`).join('')}</optgroup>`:''}).join('')).join('');
 }
 function openZone(zid){cur={t:'zone',id:zid};drawZone()}
-const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'미배정');
+const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'유휴');
 const sc=a=>a.status==='분실'?' sc-er':a.status==='폐기'?' sc-in':a.status==='반출'?' sc-ex':a.status==='처분'?' sc-wn':!a.zone_id?' sc-ok':'';
 const aCols=(a,lc=true)=>`${lc?`<span>${esc(zname(a))}</span>`:''}<span>${esc(a.drawing_code||'')}</span><span>${esc(a.asset_no||'')}</span><b>${esc(a.name)}</b><span>${esc(a.manager||'')}</span>`;
 let srt={k:null,d:1};
@@ -387,24 +388,24 @@ async function showHist(id,el){
   if(!el.hidden){el.hidden=true;return}
   const h=await q(sb.from('asset_history').select('*').eq('asset_id',id).order('created_at',{ascending:false}).limit(30));
   el.innerHTML=h.map(x=>{
-    const mv=x.action==='이동'||x.action==='구역삭제'?` ${esc(x.from_zone_name||'미배정')} → ${esc(x.to_zone_name||'미배정')}`:x.action==='상태변경'?` ${esc(x.from_status)} → ${esc(x.to_status)}`:x.to_zone_name?' '+esc(x.to_zone_name):'';
+    const mv=x.action==='이동'||x.action==='구역삭제'?` ${esc(x.from_zone_name||'유휴')} → ${esc(x.to_zone_name||'유휴')}`:x.action==='상태변경'?` ${esc(x.from_status)} → ${esc(x.to_status)}`:x.to_zone_name?' '+esc(x.to_zone_name):'';
     return `${fmt(x.created_at)} · <b>${esc(x.action)}</b>${mv} · ${esc(x.changed_by||'')}${x.note?' · '+esc(x.note):''}`}).join('<br>')||'이력이 없습니다.';
   el.hidden=false;
 }
 
-/* ---------- 자산 목록 (검색 / 미배정·종료) ---------- */
+/* ---------- 자산 목록 (검색 / 유휴·종료) ---------- */
 const unCount=()=>D.a.filter(a=>a.status==='사용중'&&!a.zone_id).length;
-function openPool(m){cur={t:'pool',qs:'',f:m==='un'?'un':'all'};drawPool()}
+function openPool(m){cur={t:'pool',qs:'',f:m||'all'};drawPool()}
 function loc(a){
-  const z=byId(D.z,a.zone_id);if(!z)return a.status==='사용중'?'미배정':a.status;
+  const z=byId(D.z,a.zone_id);if(!z)return a.status==='사용중'?'유휴':a.status;
   return fpName(byId(D.f,z.floorplan_id))+' / '+z.name;
 }
 function drawPool(){
   const k=cur.qs.trim().toLowerCase();
   const idle=!k&&cur.f==='all';
-  const as=idle?[]:sortAssets(D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k))));
+  const as=idle?[]:sortAssets(D.a.filter(a=>(cur.f==='all'||(cur.f==='un'?!a.zone_id||a.status!=='사용중':cur.f==='유휴'?a.status==='사용중'&&!a.zone_id:a.status===cur.f))&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k))));
   const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색${idle?'':` · ${as.length}개`}</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
-  <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
+  <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>유휴·종료만</option>${['유휴','처분','분실','폐기','반출'].map(s=>`<option value="${s}" ${cur.f===s?'selected':''}>${s}만</option>`).join('')}</select></div>
   ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row ar${sc(a)}" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':'<button class="b3" data-as>구역 배정</button>'}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button>${a.status!=='사용중'?'<button class="b3" data-del>삭제</button>':''}</span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
   bindSort(o);
   const qi=o.querySelector('#pq');
@@ -531,16 +532,16 @@ function bindEditor(){
 }
 async function delZone(id){
   const z=byId(D.z,id),n=assetsIn(id).length;
-  const v=await ask(n>0?`'${z.name}' 구역에 자산 ${n}개가 있습니다`:`구역 '${z.name}'을(를) 삭제할까요?`,[...(n>0?[{k:'pw',label:'삭제 암호를 입력하세요. 구역만 삭제되고 자산은 미배정으로 남습니다.',type:'password'}]:[]),whoField()],'삭제');
+  const v=await ask(n>0?`'${z.name}' 구역에 자산 ${n}개가 있습니다`:`구역 '${z.name}'을(를) 삭제할까요?`,[...(n>0?[{k:'pw',label:'삭제 암호를 입력하세요. 구역만 삭제되고 자산은 유휴으로 남습니다.',type:'password'}]:[]),whoField()],'삭제');
   if(!v)return;
   const pw=n>0?v.pw:null,by=byOf(v);
   const c=await rpc('delete_zone',{p_zone:id,p_password:pw,p_by:by});
   if(ed.zid===id)resetEd();
-  await refresh();toast(c>0?`구역을 삭제했습니다. 자산 ${c}개는 미배정입니다.`:'구역을 삭제했습니다.');
+  await refresh();toast(c>0?`구역을 삭제했습니다. 자산 ${c}개는 유휴입니다.`:'구역을 삭제했습니다.');
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014175227';
+const APP_VER='20261014180125';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
