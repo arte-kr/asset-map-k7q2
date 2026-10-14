@@ -39,6 +39,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .bcard:hover{filter:brightness(1.25)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .chip{padding:6px 13px;border-radius:5px;background:var(--card);color:var(--tx);border:1px solid var(--bd);cursor:pointer;font-size:13px;font-weight:600}
+.chip.ref{border-style:dashed}
 .chip.on{background:var(--btn);border-color:var(--btn);color:#fff}
 .tools{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .scroll{overflow:auto;background:#fff;border:1px solid var(--bd);border-radius:var(--r);max-height:72vh}
@@ -89,6 +90,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 <div id="ov" hidden></div>
 <div id="ov2" hidden></div>
 <div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script>
 const SB_URL='https://omqnuhrshddkoarbiiei.supabase.co';
@@ -110,6 +112,7 @@ const byId=(arr,id)=>arr.find(x=>x.id===id);
 const zonesOf=fid=>D.z.filter(z=>z.floorplan_id===fid);
 const assetsIn=zid=>D.a.filter(a=>a.zone_id===zid);
 const fmt=t=>new Date(t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const isPdf=p=>/\.pdf$/i.test(p||'');
 const imgUrl=p=>p?sb.storage.from(BUCKET).getPublicUrl(p).data.publicUrl:'';
 const fpName=f=>{const b=byId(D.b,f.building_id)?.name||'';return f.name===b?b:`${b} / ${f.name}`};
 const pts2s=p=>p.map(q=>q.x+','+q.y).join(' ');
@@ -163,14 +166,18 @@ function toggleTheme(){
 function go(h){location.hash=h}
 window.addEventListener('hashchange',()=>{zoom=1;render()});
 async function render(force){
-  const [,r,id]=location.hash.split('/');
+  const [,r,id,idx]=location.hash.split('/');
   const top=$('#top'),app=$('#app');
   const gear='<button onclick="go(\'#/s\')" class="ic" aria-label="설정" title="설정">'+ICON_GEAR+'</button>',list='<button class="ic" onclick="openPool()" aria-label="자산 검색" title="자산 검색">'+ICON_SEARCH+'</button>',tg=`<button class="ic" onclick="toggleTheme()" aria-label="다크/라이트 모드 전환" title="다크/라이트 모드 전환">${document.documentElement.dataset.theme==='dark'?ICON_SUN:ICON_MOON}</button>`;
   const home=`<button class="ic" onclick="go('#/')" aria-label="홈" title="홈">${ICON_HOME}</button>`;
-  if(r==='f'&&byId(D.f,id)){
+  if(r==='r'&&byId(D.f,id)&&(byId(D.f,id).refs||[])[+idx]){
+    const f=byId(D.f,id),b=byId(D.b,f.building_id),rf=f.refs[+idx];
+    top.innerHTML=`<button onclick="go('#/f/${f.id}')">←</button><h1>${esc(b.name)}</h1>${home}${tg}${list}${gear}`;
+    app.innerHTML=viewRef(f,b,+idx);if(isPdf(rf.path))renderPdf(imgUrl(rf.path));
+  }else if(r==='f'&&byId(D.f,id)){
     const f=byId(D.f,id),b=byId(D.b,f.building_id);
     top.innerHTML=`<button onclick="go('#/')">←</button><h1>${esc(b.name)}</h1>${home}${tg}${list}${gear}`;
-    app.innerHTML=viewPlan(f,b);bindPlan(f);
+    app.innerHTML=viewPlan(f,b);bindPlan();
   }else if(r==='s'){
     top.innerHTML=`<button onclick="go('#/')">←</button><h1>설정</h1>${home}${tg}`;
     if(!force&&ed.pts.length&&app.querySelector('#edst')){return}
@@ -193,16 +200,46 @@ function openBuilding(id){
 
 /* ---------- 도면 보기 ---------- */
 function labels(zs){return zs.map(z=>{const c=center(z.points);return `<div class="lb" style="left:${c.x}%;top:${c.y}%">${esc(z.name)}<br>${assetsIn(z.id).length}</div>`}).join('')}
+function chipRow(f,fps,ri){
+  const cr=ri!=null,refs=f.refs||[];
+  const c=(x,on,l)=>`<div class="chip ${on?'on':''}" onclick="go('#/f/${x.id}')">${esc(l)}</div>`;
+  let s='';
+  if(fps.length>1||refs.length)s+=`<div class="chips">${fps.map(x=>c(x,!cr&&x.id===f.id,x.name)).join('')}${refs.length?`<div class="chip ref ${cr?'on':''}" onclick="go('#/r/${f.id}/0')">도면코드 도면</div>`:''}</div>`;
+  if(cr)s+=`<div class="chips">${refs.map((r,i)=>`<div class="chip ${i===ri?'on':''}" onclick="go('#/r/${f.id}/${i}')">${esc(r.name)}</div>`).join('')}</div>`;
+  return s;
+}
 function viewPlan(f,b){
   const zs=zonesOf(f.id),fps=D.f.filter(x=>x.building_id===b.id);
-  return `${fps.length>1?`<div class="chips">${fps.map(x=>`<div class="chip ${x.id===f.id?'on':''}" onclick="go('#/f/${x.id}')">${esc(x.name)}</div>`).join('')}</div>`:''}
+  return `${chipRow(f,fps)}
   <div class="tools"><button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button><span class="muted">구역을 누르면 자산 목록이 열립니다 · 도면코드 ${esc(f.code)}</span></div>
   <div class="scroll"><div class="stage" id="stage" style="width:${zoom*100}%"><img src="${imgUrl(f.image_path)}" alt="">
   <svg viewBox="0 0 100 100" preserveAspectRatio="none">${zs.map(z=>`<polygon data-z="${z.id}" points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".35" stroke="${z.color}"/>`).join('')}</svg>${labels(zs)}</div></div>
   <div class="zl">${zs.map(z=>`<div class="zb" data-z="${z.id}"><i style="background:${z.color}"></i>${esc(z.name)} <em>${assetsIn(z.id).length}</em></div>`).join('')||'<span class="muted">이 도면에는 구역이 없습니다. 설정에서 구역을 추가하세요.</span>'}</div>`;
 }
 function setZoom(d){zoom=Math.max(1,Math.min(4,zoom+d));const s=$('#stage');if(s)s.style.width=zoom*100+'%'}
+function viewRef(f,b,ri){
+  const r=(f.refs||[])[ri];
+  return `${chipRow(f,D.f.filter(x=>x.building_id===b.id),ri)}
+  <div class="tools"><button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button><span class="muted">도면코드 도면 · ${esc(r.name)}</span></div>
+  <div class="scroll"><div class="stage" id="stage" style="width:${zoom*100}%">${isPdf(r.path)?'<div id="pdfwrap" class="muted" style="line-height:1.5;padding:16px">도면을 불러오는 중…</div>':`<img src="${imgUrl(r.path)}" alt="">`}</div></div>`;
+}
 function bindPlan(){$('#app').querySelectorAll('[data-z]').forEach(e=>e.onclick=()=>openZone(e.dataset.z))}
+async function renderPdf(url){
+  const w=$('#pdfwrap'),tok=renderPdf.t=Symbol();
+  try{
+    if(!window.pdfjsLib)throw new Error('PDF 보기 기능을 불러오지 못했습니다. 새로고침해 주세요.');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf=await pdfjsLib.getDocument(url).promise;
+    if(renderPdf.t!==tok)return;
+    w.innerHTML='';w.style.padding='0';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i),v0=pg.getViewport({scale:1}),vp=pg.getViewport({scale:1800/v0.width}),c=document.createElement('canvas');
+      c.width=vp.width;c.height=vp.height;c.style.cssText='width:100%;display:block;background:#fff;margin-bottom:6px';
+      if(renderPdf.t!==tok)return;
+      w.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    }
+  }catch(e){if(renderPdf.t===tok)w.textContent='PDF를 표시하지 못했습니다: '+(e.message||e)}
+}
 
 /* ---------- 구역 팝업 ---------- */
 function zoneOpts(except){
@@ -318,10 +355,11 @@ async function viewSettings(){
   <div class="fr" style="margin-top:10px"><input id="bn" placeholder="새 건물 이름"><button class="b1" id="bad">건물 추가</button></div></div>
   <div class="card sec"><h2>도면</h2>
   ${D.b.length?`<select id="fpb" style="margin-bottom:8px">${D.b.map(b=>`<option value="${b.id}" ${b.id===fpb?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
-  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${f.code!==f.name?esc(f.code)+' ':''}${f.image_path?'':'이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><button class="b3" data-fren="${f.id}">이름·코드</button><button class="b3 dg" data-fdel="${f.id}">삭제</button></div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
+  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${f.image_path?'':'이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><label class="b3" style="margin:0;cursor:pointer">도면코드 도면 추가<input type="file" accept="image/*,application/pdf" multiple hidden data-fref="${f.id}"></label><button class="b3 dg" data-fdel="${f.id}">삭제</button>${(f.refs||[]).length?`<div class="muted" style="flex-basis:100%">도면코드 도면: ${(f.refs||[]).map((r,i)=>`${esc(r.name)} <u data-rdel="${f.id}:${i}" style="cursor:pointer;color:var(--dg)">삭제</u>`).join(' · ')}</div>`:''}</div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
   <div style="margin-top:12px" class="muted">도면 추가</div>
-  <div class="fr"><input id="fn" placeholder="도면명 (선택) 예: 전시장 2층"><input id="fc" placeholder="도면코드 (선택) 도면에 적힌 코드, 예: TF-0-02"></div>
-  <div class="fr"><input id="ff" type="file" accept="image/*"><button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
+  <label class="muted" style="display:block;margin-bottom:6px">일반 도면 (필수)<input id="ff" type="file" accept="image/*" style="margin-top:4px"></label>
+  <label class="muted" style="display:block;margin-bottom:8px">도면코드 도면 (선택 · PDF 또는 이미지, 여러 개 가능)<input id="fr" type="file" accept="image/*,application/pdf" multiple style="margin-top:4px"></label>
+  <button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>구역</h2>
   ${D.f.length?`<select id="edf" style="margin-bottom:8px">${D.f.map(f=>`<option value="${f.id}" ${f.id===edf?'selected':''}>${esc(fpName(f))}</option>`).join('')}</select>
   <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.tool==='circle'?'원의 중심에서 바깥으로 드래그하세요':'도면 위를 드래그하세요'}</span></div>
@@ -343,15 +381,16 @@ function bindSettings(){
   A.querySelectorAll('[data-bdel]').forEach(e=>e.onclick=()=>act(async()=>{const b=byId(D.b,e.dataset.bdel);if(D.f.some(f=>f.building_id===b.id))throw new Error('도면이 있는 건물은 삭제할 수 없습니다. 도면을 먼저 삭제하세요.');if(!await confirmBox(`건물 '${b.name}'을(를) 삭제할까요?`,'삭제'))return;await q(sb.from('buildings').delete().eq('id',b.id));await refresh()}));
   A.querySelector('#fpb')?.addEventListener('change',e=>{st.fpb=e.target.value;render()});
   on('#fad',async()=>{
-    const file=$('#ff').files[0];
-    if(!file)throw new Error('도면 이미지 파일을 선택하세요.');
-    const bn=byId(D.b,st.fpb).name,n=D.f.filter(f=>f.building_id===st.fpb).length,name=$('#fn').value.trim()||(n?`${bn} ${n+1}`:bn);let code=$('#fc').value.trim();
-    if(code){if(D.f.some(f=>f.code===code))throw new Error('같은 도면코드가 이미 있습니다.')}else{code=name;while(D.f.some(f=>f.code===code))code+='-'+Math.floor(Math.random()*90+10)}
-    const path=await upload(file,code);
-    await q(sb.from('floorplans').insert({building_id:st.fpb,code,name,image_path:path,sort:D.f.length+1}));await refresh();toast('도면을 추가했습니다.');
+    const file=$('#ff').files[0],rf=[...$('#fr').files];
+    if(!file)throw new Error('일반 도면 이미지 파일을 선택하세요.');
+    const bn=byId(D.b,st.fpb).name,n=D.f.filter(f=>f.building_id===st.fpb).length,name=n?`${bn} ${n+1}`:bn;let code=name;while(D.f.some(f=>f.code===code))code+='-'+Math.floor(Math.random()*90+10);
+    const path=await upload(file,code),refs=[];
+    for(const x of rf)refs.push({name:x.name.replace(/\.[^.]+$/,''),path:await upload(x,code+'_ref')});
+    await q(sb.from('floorplans').insert({building_id:st.fpb,code,name,image_path:path,refs,sort:D.f.length+1}));await refresh();toast('도면을 추가했습니다.');
   });
   A.querySelectorAll('[data-fimg]').forEach(e=>e.onchange=()=>act(async()=>{const f=byId(D.f,e.dataset.fimg),file=e.files[0];if(!file)return;const path=await upload(file,f.code);await q(sb.from('floorplans').update({image_path:path}).eq('id',f.id));await refresh();toast('이미지를 교체했습니다.')}));
-  A.querySelectorAll('[data-fren]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fren),v=await ask('도면명·도면코드',[{k:'name',label:'도면명',value:f.name},{k:'code',label:'도면코드 (도면에 적힌 코드)',value:f.code}]);if(!v||!v.name.trim())return;const code=v.code.trim()||v.name.trim();if(D.f.some(x=>x.id!==f.id&&x.code===code))throw new Error('같은 도면코드가 이미 있습니다.');await q(sb.from('floorplans').update({name:v.name.trim(),code}).eq('id',f.id));await refresh()}));
+  A.querySelectorAll('[data-fref]').forEach(e=>e.onchange=()=>act(async()=>{const f=byId(D.f,e.dataset.fref),fl=[...e.files];if(!fl.length)return;const add=[];for(const x of fl)add.push({name:x.name.replace(/\.[^.]+$/,''),path:await upload(x,f.code+'_ref')});await q(sb.from('floorplans').update({refs:[...(f.refs||[]),...add]}).eq('id',f.id));await refresh();toast('도면코드 도면을 추가했습니다.')}));
+  A.querySelectorAll('[data-rdel]').forEach(e=>e.onclick=()=>act(async()=>{const[fid,i]=e.dataset.rdel.split(':'),f=byId(D.f,fid),r=(f.refs||[])[+i];if(!await confirmBox(`도면코드 도면 '${r.name}'을(를) 목록에서 삭제할까요?`,'삭제'))return;await q(sb.from('floorplans').update({refs:f.refs.filter((_,k)=>k!==+i)}).eq('id',f.id));await refresh()}));
   A.querySelectorAll('[data-fdel]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fdel);if(zonesOf(f.id).length)throw new Error('구역이 있는 도면은 삭제할 수 없습니다. 구역을 먼저 삭제하세요.');if(!await confirmBox(`도면 '${f.name}'을(를) 삭제할까요?`,'삭제'))return;await q(sb.from('floorplans').delete().eq('id',f.id));await refresh()}));
   A.querySelector('#edf')?.addEventListener('change',e=>{st.edf=e.target.value;resetEd();render()});
   bindEditor();
@@ -359,7 +398,7 @@ function bindSettings(){
 }
 async function upload(file,code){
   const ext=(file.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'');
-  const path=`${code.replace(/[^A-Za-z0-9_-]/g,'_')||'plan'}_${Date.now()}.${ext}`;
+  const path=`${code.replace(/[^A-Za-z0-9_-]/g,'_')||'plan'}_${Date.now()}${Math.random().toString(36).slice(2,5)}.${ext}`;
   const{error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type||'image/png'});
   if(error)throw error;return path;
 }
