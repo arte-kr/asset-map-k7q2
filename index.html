@@ -361,8 +361,8 @@ async function setStatus(id){
 }
 async function delAsset(id){
   const a=byId(D.a,id);
-  const v=await ask(`'${a.name}' (${a.status}) 자산을 삭제할까요?`,[{k:'pw',label:'삭제 암호를 입력하세요. 자산과 변경 이력이 완전히 삭제되며 되돌릴 수 없습니다.',type:'password'},whoField()],'삭제');if(!v)return;
-  await rpc('delete_asset',{p_asset:id,p_password:v.pw});await refresh();toast('자산을 삭제했습니다.');
+  const v=await ask(`'${a.name}' (${a.status}) 자산을 삭제할까요?`,[{k:'pw',label:'삭제 암호를 입력하세요. 자산은 완전히 삭제되며 되돌릴 수 없습니다. 변경 이력은 설정의 삭제 이력에 남습니다.',type:'password'},whoField()],'삭제');if(!v)return;
+  await rpc('delete_asset',{p_asset:id,p_password:v.pw,p_by:byOf(v)});await refresh();toast('자산을 삭제했습니다.');
 }
 const zlabel=zid=>{const z=byId(D.z,zid),f=byId(D.f,z?.floorplan_id);return f?`${fpName(f)} / ${z.name}`:''};
 const assetFields=a=>[{k:'code',label:'도면코드',value:a?.drawing_code},{k:'asset_no',label:'자산번호',value:a?.asset_no},{k:'name',label:'자산명 *',value:a?.name},
@@ -388,7 +388,7 @@ async function showHist(id,el){
   if(!el.hidden){el.hidden=true;return}
   const h=await q(sb.from('asset_history').select('*').eq('asset_id',id).order('created_at',{ascending:false}).limit(30));
   el.innerHTML=h.map(x=>{
-    const mv=x.action==='이동'||x.action==='구역삭제'?` ${esc(x.from_zone_name||'유휴')} → ${esc(x.to_zone_name||'유휴')}`:x.action==='상태변경'?` ${esc(x.from_status)} → ${esc(x.to_status)}`:x.to_zone_name?' '+esc(x.to_zone_name):'';
+    const mv=x.action==='이동'||x.action==='구역삭제'?` ${esc(x.from_zone_name||'유휴')} → ${esc(x.to_zone_name||'유휴')}`:x.action==='상태변경'?` ${esc(x.from_status)} → ${esc(x.to_status)}`:x.action==='삭제'?` (${esc(x.from_status)} 상태에서)`:x.to_zone_name?' '+esc(x.to_zone_name):'';
     return `${fmt(x.created_at)} · <b>${esc(x.action)}</b>${mv} · ${esc(x.changed_by||'')}${x.note?' · '+esc(x.note):''}`}).join('<br>')||'이력이 없습니다.';
   el.hidden=false;
 }
@@ -435,6 +435,7 @@ async function viewSettings(){
   const fps=D.f.filter(f=>f.building_id===fpb);
   const edf=st.edf&&byId(D.f,st.edf)?st.edf:D.f[0]?.id;st.edf=edf;const edb=byId(D.f,edf)?.building_id;
   const zs=edf?zonesOf(edf):[];
+  const dl=await q(sb.from('asset_history').select('*').eq('action','삭제').order('created_at',{ascending:false}).limit(50));
   return `
   <div class="card sec"><h2>건물</h2>${D.b.map(b=>`<div class="li"><span>${esc(b.name)}</span><span class="sw" title="배지 색">${SW.map(c=>`<i data-bc="${b.id}" data-c="${c}" class="${(b.color||'')===c?'on':''}" style="background:${c||'var(--bcard)'}"></i>`).join('')}</span><button class="b3" data-bren="${b.id}">이름 변경</button><button class="b3 dg" data-bdel="${b.id}">삭제</button></div>`).join('')||'<div class="muted">등록된 건물이 없습니다.</div>'}
   <div class="fr" style="margin-top:10px"><input id="bn" placeholder="새 건물 이름"><button class="b1" id="bad">건물 추가</button></div></div>
@@ -453,6 +454,7 @@ async function viewSettings(){
   ${zs.map(z=>`<div class="li"><span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${z.color}"></i> ${esc(z.name)} <span class="muted">자산 ${assetsIn(z.id).length}</span></span><button class="b3" data-zed="${z.id}">수정</button><button class="b3 dg" data-zdel="${z.id}">삭제</button></div>`).join('')}`:'<div class="muted">먼저 도면을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>직원 명단</h2>${D.s.map(s=>`<div class="li"><span>${esc(s.name)}</span><button class="b3 dg" data-sdel="${s.id}">삭제</button></div>`).join('')||'<div class="muted">등록된 직원이 없습니다. 이름을 추가하면 자산 이동·등록 때 작업자와 관리자를 선택할 수 있습니다.</div>'}
   <div class="fr" style="margin-top:10px"><input id="sn" placeholder="직원 이름"><button class="b1" id="sad">직원 추가</button></div></div>
+  <div class="card sec"><h2>삭제 이력</h2>${dl.map(x=>`<div class="li"><span>${esc(x.asset_name||'(이름 없음)')} <span class="muted">${esc(x.asset_no||'')} · ${esc(x.from_status||'')} · ${esc(x.changed_by||'')} · ${fmt(x.created_at)}</span></span><button class="b3" data-dh="${x.asset_id}">이력</button></div><div class="hist" hidden data-dhe="${x.asset_id}"></div>`).join('')||'<div class="muted">삭제된 자산이 없습니다.</div>'}</div>
   <div class="card sec"><h2>삭제 암호</h2><div class="muted" style="margin-bottom:8px">자산이 있는 구역을 삭제할 때 필요합니다. ${has?'암호가 설정되어 있습니다.':'<b style="color:var(--dg)">아직 설정되지 않았습니다.</b>'}</div>
   <div class="fr">${has?'<input id="pwo" type="password" placeholder="기존 암호">':''}<input id="pwn" type="password" placeholder="새 암호 (4자 이상)"><button class="b1" id="pwb">${has?'암호 변경':'암호 설정'}</button></div></div>`;
 }
@@ -481,6 +483,7 @@ function bindSettings(){
   A.querySelectorAll('[data-edb]').forEach(e=>e.onclick=()=>{st.edf=D.f.find(f=>f.building_id===e.dataset.edb)?.id;resetEd();render()});
   A.querySelectorAll('[data-edf]').forEach(e=>e.onclick=()=>{st.edf=e.dataset.edf;resetEd();render()});
   bindEditor();
+  A.querySelectorAll('[data-dh]').forEach(e=>e.onclick=()=>act(()=>showHist(e.dataset.dh,A.querySelector(`[data-dhe="${e.dataset.dh}"]`))));
   on('#pwb',async()=>{await rpc('set_delete_password',{p_new:$('#pwn').value,p_old:$('#pwo')?.value||null});toast('삭제 암호를 저장했습니다.');render()});
 }
 async function upload(file,code){
@@ -541,7 +544,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014180125';
+const APP_VER='20261014180455';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
