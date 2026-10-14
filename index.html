@@ -123,7 +123,7 @@ let D={b:[],f:[],z:[],a:[],s:[]};
 let cur=null;
 let zoom=1;
 const st={fpb:null,edf:null};
-let ed={zid:null,tool:'rect',pts:[],sh:null};
+let ed={zid:null,tool:'rect',pts:[],sh:null,mode:'add'};
 
 const byId=(arr,id)=>arr.find(x=>x.id===id);
 const zonesOf=fid=>D.z.filter(z=>z.floorplan_id===fid);
@@ -228,7 +228,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>fitChips()
 /* ---------- 홈 ---------- */
 function viewHome(){
   if(!D.b.length)return `<div class="empty">등록된 건물이 없습니다.<br><br><button class="b1" onclick="go('#/s')">설정에서 건물 추가</button></div>`;
-  const cnt=[['유휴','ok',unCount()],...[['처분','wn'],['분실','er'],['폐기','in'],['반출','ex']].map(([v,c])=>[v,c,D.a.filter(x=>x.status===v).length])].filter(x=>x[2]);
+  const cnt=[['미배정','ok',unCount()],...[['처분','wn'],['분실','er'],['폐기','in'],['반출','ex']].map(([v,c])=>[v,c,D.a.filter(x=>x.status===v).length])].filter(x=>x[2]);
   return `<div class="grid">${D.b.map(b=>`<div class="bcard" style="${b.color?`background:${b.color}`:''}" onclick="openBuilding('${b.id}')">${esc(b.name)}</div>`).join('')}</div>${cnt.length?`<div class="muted" style="margin:14px 0 6px">상태 자산</div><div class="sbs">${cnt.map(([l,c,n])=>`<div class="sb sc-${c}" onclick="openPool('${l}')"><i></i>${l}<b>${n}</b></div>`).join('')}</div>`:''}`;
 }
 function openBuilding(id){
@@ -268,7 +268,7 @@ function bindPinch(){
   sc.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();anchor(e.clientX,e.clientY);apply(zoom*(e.deltaY<0?1.15:1/1.15))},{passive:false});
 }
 function edHtml(f){
-  return `<div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">정사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.pts.length?'모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요':'도면에서 구역을 놓을 위치를 누르세요'}</span></div>
+  return `<div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">정사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><button class="b3 ${ed.mode==='move'?'on':''}" id="tmove">이동</button><span class="muted">${ed.mode==='move'?'옮길 구역을 끌어서 이동하세요':ed.pts.length?'모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요':'도면에서 구역을 놓을 위치를 누르세요'}</span></div>
   <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(f.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div><div id="edhd" class="hd" hidden></div></div></div>
   <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">구역 추가</button></div>`;
 }
@@ -341,7 +341,7 @@ function zoneOpts(except){
     return zs.length?`<optgroup label="${esc(b.name+' / '+f.name)}">${zs.map(z=>`<option value="${z.id}">${esc(z.name)}</option>`).join('')}</optgroup>`:''}).join('')).join('');
 }
 function openZone(zid){cur={t:'zone',id:zid};drawZone()}
-const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'유휴');
+const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'미배정');
 const sc=a=>a.status==='분실'?' sc-er':a.status==='폐기'?' sc-in':a.status==='반출'?' sc-ex':a.status==='처분'?' sc-wn':!a.zone_id?' sc-ok':'';
 const aCols=(a,lc=true)=>`${lc?`<span>${esc(zname(a))}</span>`:''}<span>${esc(a.drawing_code||'')}</span><span>${esc(a.asset_no||'')}</span><b>${esc(a.name)}</b><span>${esc(a.manager||'')}</span>`;
 let srt={k:null,d:1};
@@ -396,6 +396,78 @@ async function setStatus(id){
   const by=byOf(v);
   await rpc('set_asset_status',{p_asset:id,p_status:v.s,p_by:by,p_note:v.note||null});await refresh();toast('상태를 변경했습니다.');
 }
+const XL_COLS=['건물','구역','도면코드','자산번호','자산명','자산 상세위치','관리자','비고','작업자'];
+const loadXlsx=()=>window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=()=>no(new Error('엑셀 기능을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.'));document.head.appendChild(s)});
+async function xlTemplate(){
+  await loadXlsx();const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([XL_COLS]),'자산');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['작성 방법'],['건물·구역은 앱 설정에 등록된 이름과 같아야 합니다. 등록되지 않았으면 업로드되지 않습니다.'],['건물·구역이 비어 있으면 미배정 자산으로 등록됩니다.'],['자산번호가 같은 자산을 같은 자산으로 보고 대조합니다. 자산번호가 없으면 자산명+도면코드로 대조합니다.'],['건물, 구역, 도면코드, 자산번호, 자산명은 대조 대상입니다. 자산 상세위치, 관리자, 비고, 작업자는 달라도 기존 값을 바꾸지 않습니다.'],['자산명은 필수입니다.']]),'작성방법');
+  XLSX.writeFile(wb,'자산등록양식.xlsx');
+}
+function xlBox(title,body,onMount){
+  const o=openOv('#ov2',`<div class="box"><div class="mh"><b>${esc(title)}</b></div><form class="mb">${body}</form></div>`);
+  const fm=o.querySelector('form'),close=()=>{o.hidden=true;o.innerHTML=''};
+  if(onMount)onMount(fm,close);return close;
+}
+const xlError=list=>xlBox('업로드 불가',`${list.slice(0,100).map(x=>`<div class="hist" style="margin-bottom:6px">${esc(x)}</div>`).join('')}<div class="btns"><button type="button" class="b1" id="c">확인</button></div>`,(fm,close)=>{fm.querySelector('#c').onclick=close});
+async function xlCompare(file){
+  await loadXlsx();
+  const wb=XLSX.read(await file.arrayBuffer()),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+  const hd=(rows[0]||[]).map(x=>String(x).trim()),miss=XL_COLS.filter(c=>!hd.includes(c));
+  if(miss.length)return xlError([`양식에 없는 열이 있습니다: ${miss.join(', ')}. 양식을 다시 내려받아 사용하세요.`]);
+  const ix=Object.fromEntries(XL_COLS.map(c=>[c,hd.indexOf(c)])),g=(r,c)=>String(r[ix[c]]??'').trim();
+  const err=[],noB=new Set(),noZ=new Set(),list=[],keys=new Map();
+  rows.slice(1).forEach((r,i)=>{
+    if(r.every(x=>String(x).trim()===''))return;
+    const n=i+2,bn=g(r,'건물'),zn=g(r,'구역'),name=g(r,'자산명');
+    if(!name){err.push(`${n}행: 자산명이 비어 있습니다.`);return}
+    let zone=null;
+    if(zn&&!bn)err.push(`${n}행: 구역(${zn})만 있고 건물이 비어 있습니다.`);
+    else if(bn){
+      const b=D.b.find(x=>x.name===bn);
+      if(!b)noB.add(bn);
+      else if(zn){
+        const zs=D.z.filter(z=>z.name===zn&&byId(D.f,z.floorplan_id)?.building_id===b.id);
+        if(!zs.length)noZ.add(`${bn} / ${zn}`);else if(zs.length>1)err.push(`${n}행: ${bn}에 '${zn}' 구역이 여러 도면에 있어 구분할 수 없습니다.`);else zone=zs[0].id;
+      }
+    }
+    const a={asset_no:g(r,'자산번호'),name,drawing_code:g(r,'도면코드'),zone_id:zone,detail_loc:g(r,'자산 상세위치'),manager:g(r,'관리자'),note:g(r,'비고'),by:g(r,'작업자')};
+    a.k=a.asset_no||`${name}|${a.drawing_code}`;
+    if(keys.has(a.k))err.push(`${n}행: ${keys.get(a.k)}행과 자산번호(또는 자산명)가 중복됩니다.`);else keys.set(a.k,n);
+    list.push(a);
+  });
+  if(noZ.size)err.unshift(`등록되지 않은 구역: ${[...noZ].join(', ')} — 설정에서 구역을 먼저 등록하세요.`);
+  if(noB.size)err.unshift(`등록되지 않은 건물: ${[...noB].join(', ')} — 설정에서 건물을 먼저 등록하세요.`);
+  if(!list.length&&!err.length)err.push('업로드할 자산이 없습니다.');
+  if(err.length)return xlError(err);
+  const cur=D.a.filter(a=>a.status==='사용중'),cm=new Map(),used=new Set(),add=[],upd=[],tag=a=>`${esc(a.name)} <span class="muted">${esc(a.asset_no||'')}</span>`;
+  cur.forEach(a=>{const k=a.asset_no||`${a.name}|${a.drawing_code||''}`;if(!cm.has(k))cm.set(k,a)});
+  let same=0;const upL=[];
+  list.forEach(a=>{
+    const c=cm.get(a.k);if(!c){add.push(a);return}
+    used.add(c.id);const ch=[];
+    if((c.zone_id||null)!==(a.zone_id||null))ch.push(`구역 ${zlabel(c.zone_id)||'미배정'} → ${zlabel(a.zone_id)||'미배정'}`);
+    if((c.drawing_code||'')!==a.drawing_code)ch.push(`도면코드 ${c.drawing_code||'-'} → ${a.drawing_code||'-'}`);
+    if(c.name!==a.name)ch.push(`자산명 ${c.name} → ${a.name}`);
+    if(ch.length){upd.push({...a,id:c.id});upL.push(`${tag(a)}: ${esc(ch.join(', '))}`)}else same++;
+  });
+  const del=cur.filter(a=>!used.has(a.id));
+  if(!add.length&&!upd.length&&!del.length)return toast(`변경 사항이 없습니다. 자산 ${same}개가 모두 일치합니다.`);
+  const sec=(t,items)=>items.length?`<div style="margin:10px 0 4px"><b>${t} ${items.length}개</b></div><div class="hist">${items.join('<br>')}</div>`:'';
+  const w=whoField();
+  xlBox('엑셀 대조 결과',`<div class="muted">일치하는 ${same}개는 그대로 유지합니다.</div>
+    ${sec('추가',add.map(a=>`${tag(a)} · ${esc(zlabel(a.zone_id)||'미배정')}`))}${sec('변경',upL)}${sec('삭제 (엑셀에 없음)',del.map(a=>`${tag(a)} · ${esc(zname(a))}`))}
+    <label style="margin-top:10px">삭제 암호<input name="pw" type="password" autocomplete="off"></label>
+    <label>${esc(w.label)}${w.type==='select'?`<select name="by">${w.options.map(o=>`<option value="${esc(o.v)}"${o.v===w.value?' selected':''}>${esc(o.t)}</option>`).join('')}</select>`:`<input name="by" value="${esc(w.value||'')}" placeholder="${esc(w.ph||'')}" autocomplete="off">`}</label>
+    <div class="btns"><button type="button" class="b2" id="c">취소</button><button class="b1">교체 등록</button></div>`,(fm,close)=>{
+    fm.querySelector('#c').onclick=close;
+    fm.onsubmit=async e=>{e.preventDefault();const v=Object.fromEntries(new FormData(fm));
+      try{const by=byOf(v),m=a=>({asset_no:a.asset_no,name:a.name,zone_id:a.zone_id,drawing_code:a.drawing_code,detail_loc:a.detail_loc,manager:a.manager,note:a.note,by:a.by});
+        const r=await rpc('apply_asset_sync',{p_password:v.pw,p_add:add.map(m),p_upd:upd.map(a=>({id:a.id,...m(a)})),p_del:del.map(a=>a.id),p_by:by});
+        close();await refresh();toast(`반영했습니다. 추가 ${r.added}, 변경 ${r.updated}, 삭제 ${r.deleted}`)
+      }catch(x){toast(x.message||String(x),true)}};
+  });
+}
 async function delAsset(id){
   const a=byId(D.a,id);
   const v=await ask(`'${a.name}' (${a.status}) 자산을 삭제할까요?`,[{k:'pw',label:'삭제 암호를 입력하세요. 자산은 완전히 삭제되며 되돌릴 수 없습니다. 변경 이력은 리포트의 삭제이력에 남습니다.',type:'password'},whoField()],'삭제');if(!v)return;
@@ -428,7 +500,7 @@ async function showHist(id,el){
   el.hidden=false;
 }
 function histLine(x){
-    const mv=x.action==='이동'||x.action==='구역삭제'?` ${esc(x.from_zone_name||'유휴')} → ${esc(x.to_zone_name||'유휴')}`:x.action==='상태변경'?` ${esc(x.from_status)} → ${esc(x.to_status)}`:x.action==='삭제'?` (${esc(x.from_status)} 상태에서)`:x.to_zone_name?' '+esc(x.to_zone_name):'';
+    const mv=x.action==='이동'||x.action==='구역삭제'?` ${esc(x.from_zone_name||'미배정')} → ${esc(x.to_zone_name||'미배정')}`:x.action==='상태변경'?` ${esc(x.from_status)} → ${esc(x.to_status)}`:x.action==='삭제'?` (${esc(x.from_status)} 상태에서)`:x.to_zone_name?' '+esc(x.to_zone_name):'';
     return `${fmt(x.created_at)} · <b>${esc(x.action)}</b>${mv} · ${esc(x.changed_by||'')}${x.note?' · '+esc(x.note):''}`;
 }
 async function viewReport(){
@@ -444,8 +516,8 @@ async function viewReport(){
 }
 async function restoreAsset(id){
   const x=await q(sb.from('asset_history').select('asset_name').eq('asset_id',id).eq('action','삭제').limit(1));
-  const v=await ask(`'${x[0]?.asset_name||''}' 자산을 복원할까요?`,[{k:'info',label:'이전 구역으로 돌아가지 않고 유휴(미배정) 상태로 복원됩니다. 복원 후 구역을 다시 배정하세요.',type:'hidden'},whoField()],'복원');if(!v)return;
-  await rpc('restore_asset',{p_asset:id,p_by:byOf(v)});await refresh();render();toast('유휴 상태로 복원했습니다. 구역을 다시 배정하세요.');
+  const v=await ask(`'${x[0]?.asset_name||''}' 자산을 복원할까요?`,[{k:'info',label:'이전 구역으로 돌아가지 않고 미배정(미배정) 상태로 복원됩니다. 복원 후 구역을 다시 배정하세요.',type:'hidden'},whoField()],'복원');if(!v)return;
+  await rpc('restore_asset',{p_asset:id,p_by:byOf(v)});await refresh();render();toast('미배정 상태로 복원했습니다. 구역을 다시 배정하세요.');
 }
 function bindReport(){
   const A=$('#app');
@@ -454,19 +526,19 @@ function bindReport(){
   A.querySelectorAll('[data-dh]').forEach(e=>e.onclick=()=>act(()=>showHist(e.dataset.dh,A.querySelector(`[data-dhe="${e.dataset.dh}"]`))));
 }
 
-/* ---------- 자산 목록 (검색 / 유휴·종료) ---------- */
+/* ---------- 자산 목록 (검색 / 미배정·종료) ---------- */
 const unCount=()=>D.a.filter(a=>a.status==='사용중'&&!a.zone_id).length;
 function openPool(m){cur={t:'pool',qs:'',f:m||'all'};drawPool()}
 function loc(a){
-  const z=byId(D.z,a.zone_id);if(!z)return a.status==='사용중'?'유휴':a.status;
+  const z=byId(D.z,a.zone_id);if(!z)return a.status==='사용중'?'미배정':a.status;
   return fpName(byId(D.f,z.floorplan_id))+' / '+z.name;
 }
 function drawPool(){
   const k=cur.qs.trim().toLowerCase();
   const idle=!k&&cur.f==='all';
-  const as=idle?[]:sortAssets(D.a.filter(a=>(cur.f==='all'||(cur.f==='un'?!a.zone_id||a.status!=='사용중':cur.f==='유휴'?a.status==='사용중'&&!a.zone_id:a.status===cur.f))&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k))));
+  const as=idle?[]:sortAssets(D.a.filter(a=>(cur.f==='all'||(cur.f==='un'?!a.zone_id||a.status!=='사용중':cur.f==='미배정'?a.status==='사용중'&&!a.zone_id:a.status===cur.f))&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k))));
   const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색${idle?'':` · ${as.length}개`}</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
-  <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>유휴·종료만</option>${['유휴','처분','분실','폐기','반출'].map(s=>`<option value="${s}" ${cur.f===s?'selected':''}>${s}만</option>`).join('')}</select></div>
+  <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option>${['미배정','처분','분실','폐기','반출'].map(s=>`<option value="${s}" ${cur.f===s?'selected':''}>${s}만</option>`).join('')}</select></div>
   ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row ar${sc(a)}" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':'<button class="b3" data-as>구역 배정</button>'}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button>${a.status!=='사용중'?'<button class="b3" data-del>삭제</button>':''}</span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
   bindSort(o);
   const qi=o.querySelector('#pq');
@@ -508,12 +580,13 @@ async function viewSettings(){
   <button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>구역</h2>
   ${D.f.length?`<div class="chips">${D.b.filter(b=>D.f.some(f=>f.building_id===b.id)).map(b=>`<div class="chip ${b.id===edb?'on':''}" data-edb="${b.id}">${esc(b.name)}</div>`).join('')}</div>${D.f.filter(f=>f.building_id===edb).length>1?`<div class="chips">${D.f.filter(f=>f.building_id===edb).map(f=>`<div class="chip ${f.id===edf?'on':''}" data-edf="${f.id}">${esc(f.name)}</div>`).join('')}</div>`:''}
-  <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">정사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.pts.length?'모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요':'도면에서 구역을 놓을 위치를 누르세요'}</span></div>
+  <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">정사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><button class="b3 ${ed.mode==='move'?'on':''}" id="tmove">이동</button><span class="muted">${ed.mode==='move'?'옮길 구역을 끌어서 이동하세요':ed.pts.length?'모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요':'도면에서 구역을 놓을 위치를 누르세요'}</span></div>
   <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(byId(D.f,edf)?.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div><div id="edhd" class="hd" hidden></div></div></div>
   <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">${ed.zid?'수정 저장':'구역 추가'}</button>${ed.zid?'<button class="b2" id="znew">취소</button>':''}</div>
   ${zs.map(z=>`<div class="li"><span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${z.color}"></i> ${esc(z.name)} <span class="muted">자산 ${assetsIn(z.id).length}</span></span><button class="b3" data-zed="${z.id}">수정</button><button class="b3 dg" data-zdel="${z.id}">삭제</button></div>`).join('')}`:'<div class="muted">먼저 도면을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>직원 명단</h2>${D.s.map(s=>`<div class="li"><span>${esc(s.name)}</span><button class="b3 dg" data-sdel="${s.id}">삭제</button></div>`).join('')||'<div class="muted">등록된 직원이 없습니다. 이름을 추가하면 자산 이동·등록 때 작업자와 관리자를 선택할 수 있습니다.</div>'}
   <div class="fr" style="margin-top:10px"><input id="sn" placeholder="직원 이름"><button class="b1" id="sad">직원 추가</button></div></div>
+  <div class="card sec"><h2>자산 엑셀 업로드</h2><div class="muted" style="margin-bottom:8px">양식에 맞춰 작성한 엑셀을 올리면 현재 자산과 대조합니다. 일치하는 자산은 그대로 두고, 추가·변경·삭제만 확인한 뒤 반영합니다.</div><div class="fr"><button class="b3" id="xlt">양식 다운로드</button><label class="b1" style="cursor:pointer;margin:0">엑셀 선택·대조<input id="xlf" type="file" accept=".xlsx" hidden></label></div></div>
   <div class="card sec"><h2>삭제 암호</h2><div class="muted" style="margin-bottom:8px">자산이 있는 구역을 삭제할 때 필요합니다. ${has?'암호가 설정되어 있습니다.':'<b style="color:var(--dg)">아직 설정되지 않았습니다.</b>'}</div>
   <div class="fr">${has?'<input id="pwo" type="password" placeholder="기존 암호">':''}<input id="pwn" type="password" placeholder="새 암호 (4자 이상)"><button class="b1" id="pwb">${has?'암호 변경':'암호 설정'}</button></div></div>`;
 }
@@ -542,6 +615,8 @@ function bindSettings(){
   A.querySelectorAll('[data-edb]').forEach(e=>e.onclick=()=>{st.edf=D.f.find(f=>f.building_id===e.dataset.edb)?.id;resetEd();render()});
   A.querySelectorAll('[data-edf]').forEach(e=>e.onclick=()=>{st.edf=e.dataset.edf;resetEd();render()});
   bindEditor();
+  on('#xlt',xlTemplate);
+  const xf=A.querySelector('#xlf');if(xf)xf.onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)act(()=>xlCompare(f))};
   on('#pwb',async()=>{await rpc('set_delete_password',{p_new:$('#pwn').value,p_old:$('#pwo')?.value||null});toast('삭제 암호를 저장했습니다.');render()});
 }
 async function upload(file,code){
@@ -552,7 +627,7 @@ async function upload(file,code){
 }
 
 /* ---------- 구역 그리기 ---------- */
-function resetEd(){ed={zid:null,tool:ed.tool,pts:[],sh:null}}
+function resetEd(){ed={zid:null,tool:ed.tool,pts:[],sh:null,mode:'add'}}
 const ED_DEF=1.8,cl100=v=>+Math.min(100,Math.max(0,v)).toFixed(2);
 const shPts=(s,W,H)=>{const k=W/H;return s.t==='circle'?Array.from({length:48},(_,i)=>{const a=i/48*2*Math.PI;return{x:cl100(s.cx+s.s*Math.cos(a)),y:cl100(s.cy+s.s*k*Math.sin(a))}}):[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>({x:cl100(s.cx+a*s.s),y:cl100(s.cy+b*s.s*k)}))};
 const ptsSh=p=>{const xs=p.map(q=>q.x),ys=p.map(q=>q.y),x0=Math.min(...xs),x1=Math.max(...xs);return{t:p.length===48?'circle':'square',cx:(x0+x1)/2,cy:(Math.min(...ys)+Math.max(...ys))/2,s:(x1-x0)/2}};
@@ -560,7 +635,7 @@ function drawEd(){
   const sv=$('#edsv');if(!sv)return;
   const others=zonesOf(st.edf).filter(z=>z.id!==ed.zid);
   const col=$('#zc')?.value||COLORS[0];
-  sv.innerHTML=others.map(z=>`<polygon points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".25" stroke="${z.color}" style="cursor:crosshair"/>`).join('')
+  sv.innerHTML=others.map(z=>`<polygon data-oz="${z.id}" points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".25" stroke="${z.color}" style="cursor:${ed.mode==='move'?'move':'crosshair'}"/>`).join('')
     +(ed.pts.length>1?`<polygon points="${pts2s(ed.pts)}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-dasharray="3 2" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`:'')
     +'';
   const hd=$('#edhd');if(hd){const s=ed.pts.length&&ed.sh,r=sv.getBoundingClientRect();hd.hidden=!s;if(s){hd.style.left=(ed.sh.cx+ed.sh.s)+'%';hd.style.top=(ed.sh.t==='circle'?ed.sh.cy:ed.sh.cy+ed.sh.s*r.width/r.height)+'%'}}
@@ -573,12 +648,16 @@ function bindEditor(){
   const hit=p=>{const[W,H]=WH(),s=ed.sh,dx=p.x-s.cx,dy=(p.y-s.cy)*H/W;return s.t==='circle'?Math.hypot(dx,dy)<=s.s:Math.abs(dx)<=s.s&&Math.abs(dy)<=s.s};
   const move=(c)=>{const s=ed.sh,dx=c.x-s.cx,dy=c.y-s.cy;ed.pts=ed.pts.map(q=>({x:cl100(q.x+dx),y:cl100(q.y+dy)}));s.cx=c.x;s.cy=c.y};
   let drag=null;
+  const inPoly=(p,pts)=>{let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)c=!c}return c};
   sv.onpointerdown=e=>{e.preventDefault();const p=pct(e),[W,H]=WH();
+    if(ed.mode==='move'){const z=[...zonesOf(st.edf).filter(x=>x.id!==ed.zid)].reverse().find(x=>inPoly(p,x.points));if(z){drag={z,sx:p.x,sy:p.y,dx:0,dy:0};sv.setPointerCapture(e.pointerId)}return}
     if(ed.pts.length&&ed.sh&&hit(p))drag={ox:p.x-ed.sh.cx,oy:p.y-ed.sh.cy};
     else{if(!ed.sh||!ed.pts.length)ed.sh={t:ed.tool==='circle'?'circle':'square',cx:p.x,cy:p.y,s:ED_DEF};else{ed.sh.cx=p.x;ed.sh.cy=p.y}ed.pts=shPts(ed.sh,W,H);drag={ox:0,oy:0};drawEd()}
     sv.setPointerCapture(e.pointerId)};
-  sv.onpointermove=e=>{if(drag){const p=pct(e);move({x:p.x-drag.ox,y:p.y-drag.oy});drawEd()}};
-  sv.onpointerup=()=>{if(drag){drag=null;const t=$('#edst')?.parentElement.previousElementSibling.querySelector('.muted');if(t)t.textContent='모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요'}};
+  sv.onpointermove=e=>{if(drag?.z){const p=pct(e),xs=drag.z.points.map(q=>q.x),ys=drag.z.points.map(q=>q.y);drag.dx=Math.min(100-Math.max(...xs),Math.max(-Math.min(...xs),p.x-drag.sx));drag.dy=Math.min(100-Math.max(...ys),Math.max(-Math.min(...ys),p.y-drag.sy));sv.querySelector(`[data-oz="${drag.z.id}"]`)?.setAttribute('transform',`translate(${drag.dx} ${drag.dy})`);return}
+    if(drag){const p=pct(e);move({x:p.x-drag.ox,y:p.y-drag.oy});drawEd()}};
+  sv.onpointerup=()=>{if(drag?.z){const d=drag;drag=null;if(d.dx||d.dy)act(async()=>{await q(sb.from('zones').update({points:d.z.points.map(p=>({x:+(p.x+d.dx).toFixed(2),y:+(p.y+d.dy).toFixed(2)}))}).eq('id',d.z.id));await refresh();drawEd();toast(`'${d.z.name}' 구역을 이동했습니다.`)});else drawEd();return}
+    if(drag){drag=null;const t=$('#edst')?.parentElement.previousElementSibling.querySelector('.muted');if(t)t.textContent='모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요'}};
   const hd=$('#edhd');
   hd.onpointerdown=e=>{e.preventDefault();e.stopPropagation();hd.setPointerCapture(e.pointerId);hd.dr=1};
   hd.onpointermove=e=>{if(!hd.dr)return;const p=pct(e),[W,H]=WH(),s=ed.sh,dx=Math.abs(p.x-s.cx),dy=Math.abs(p.y-s.cy)*H/W;s.s=Math.min(30,Math.max(.8,s.t==='circle'?Math.hypot(dx,dy):Math.max(dx,dy)));ed.pts=shPts(s,W,H);drawEd()};
@@ -586,6 +665,7 @@ function bindEditor(){
   if(ed.pts.length&&!ed.sh)ed.sh=ptsSh(ed.pts);
   const tool=t=>{ed.tool=t;if(ed.sh&&ed.pts.length){const[W,H]=WH();ed.sh.t=t==='circle'?'circle':'square';ed.pts=shPts(ed.sh,W,H)}if(cur?.t==='zadd')drawZoneAdd();else render(true)};
   $('#trect').onclick=()=>tool('rect');$('#tcircle').onclick=()=>tool('circle');
+  $('#tmove').onclick=()=>{ed.mode=ed.mode==='move'?'add':'move';if(cur?.t==='zadd')drawZoneAdd();else render(true)};
   $('#tclr').onclick=()=>{ed.pts=[];ed.sh=null;drawEd()};
   $('#zc').onchange=drawEd;
   const z=ed.zid&&byId(D.z,ed.zid);
@@ -606,16 +686,16 @@ function bindEditor(){
 }
 async function delZone(id){
   const z=byId(D.z,id),n=assetsIn(id).length;
-  const v=await ask(n>0?`'${z.name}' 구역에 자산 ${n}개가 있습니다`:`구역 '${z.name}'을(를) 삭제할까요?`,[...(n>0?[{k:'pw',label:'삭제 암호를 입력하세요. 구역만 삭제되고 자산은 유휴으로 남습니다.',type:'password'}]:[]),whoField()],'삭제');
+  const v=await ask(n>0?`'${z.name}' 구역에 자산 ${n}개가 있습니다`:`구역 '${z.name}'을(를) 삭제할까요?`,[...(n>0?[{k:'pw',label:'삭제 암호를 입력하세요. 구역만 삭제되고 자산은 미배정으로 남습니다.',type:'password'}]:[]),whoField()],'삭제');
   if(!v)return;
   const pw=n>0?v.pw:null,by=byOf(v);
   const c=await rpc('delete_zone',{p_zone:id,p_password:pw,p_by:by});
   if(ed.zid===id)resetEd();
-  await refresh();toast(c>0?`구역을 삭제했습니다. 자산 ${c}개는 유휴입니다.`:'구역을 삭제했습니다.');
+  await refresh();toast(c>0?`구역을 삭제했습니다. 자산 ${c}개는 미배정입니다.`:'구역을 삭제했습니다.');
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014181657';
+const APP_VER='20261014183320';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
