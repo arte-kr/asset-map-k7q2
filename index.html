@@ -217,6 +217,7 @@ function openBuilding(id){
 
 /* ---------- 도면 보기 ---------- */
 function labels(zs){return zs.map(z=>{const c=center(z.points);return `<div class="lb" style="left:${c.x}%;top:${c.y}%">${esc(z.name)}<span class="cn">${assetsIn(z.id).length}</span></div>`}).join('')}
+const bldChips=b=>`<div class="chips">${D.b.map(x=>`<div class="chip ${x.id===b.id?'on':''}" onclick="openBuilding('${x.id}')">${esc(x.name)}</div>`).join('')}</div>`;
 function chipRow(f,fps,ri){
   const cr=ri!=null,refs=f.refs||[];
   const c=(x,on,l)=>`<div class="chip ${on?'on':''}" onclick="go('#/f/${x.id}')">${esc(l)}</div>`;
@@ -227,7 +228,7 @@ function chipRow(f,fps,ri){
 }
 function viewPlan(f,b){
   const zs=zonesOf(f.id),fps=D.f.filter(x=>x.building_id===b.id);
-  return `${chipRow(f,fps)}
+  return `${bldChips(b)}${chipRow(f,fps)}
   <div class="tools"><button class="b3" onclick="openZoneAdd('${f.id}')">＋ 구역 추가</button><button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button><span class="muted">구역을 누르면 자산 목록이 열립니다</span></div>
   <div class="scroll"><div class="stage" id="stage" style="width:${zoom*100}%"><img src="${imgUrl(f.image_path)}" alt="">
   <svg viewBox="0 0 100 100" preserveAspectRatio="none">${zs.map(z=>`<polygon data-z="${z.id}" points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".35" stroke="${z.color}"/>`).join('')}</svg>${labels(zs)}</div></div>
@@ -259,7 +260,7 @@ function drawZoneAdd(){
 function setZoom(d){zoom=Math.max(1,Math.min(6,zoom+d));const s=$('#stage');if(s)s.style.width=zoom*100+'%'}
 function viewRef(f,b,ri){
   const r=(f.refs||[])[ri];
-  return `${chipRow(f,D.f.filter(x=>x.building_id===b.id),ri)}
+  return `${bldChips(b)}${chipRow(f,D.f.filter(x=>x.building_id===b.id),ri)}
   <div class="tools"><button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button><span class="muted">도면코드 도면 · ${esc(r.name)}</span></div>
   <div class="scroll"><div class="stage" id="stage" style="width:${zoom*100}%">${isPdf(r.path)?'<div id="pdfwrap" class="muted" style="line-height:1.5;padding:16px">도면을 불러오는 중…</div>':`<img src="${imgUrl(r.path)}" alt="">`}</div></div>`;
 }
@@ -508,7 +509,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014173808';
+const APP_VER='20261014173959';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
