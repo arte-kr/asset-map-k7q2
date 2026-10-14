@@ -228,10 +228,10 @@ function chipRow(f,fps,ri){
 function viewPlan(f,b){
   const zs=zonesOf(f.id),fps=D.f.filter(x=>x.building_id===b.id);
   return `${chipRow(f,fps)}
-  <div class="tools"><button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button><span class="muted">구역을 누르면 자산 목록이 열립니다</span></div>
+  <div class="tools"><button class="b3" onclick="openZoneAdd('${f.id}')">＋ 구역 추가</button><button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button><span class="muted">구역을 누르면 자산 목록이 열립니다</span></div>
   <div class="scroll"><div class="stage" id="stage" style="width:${zoom*100}%"><img src="${imgUrl(f.image_path)}" alt="">
   <svg viewBox="0 0 100 100" preserveAspectRatio="none">${zs.map(z=>`<polygon data-z="${z.id}" points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".35" stroke="${z.color}"/>`).join('')}</svg>${labels(zs)}</div></div>
-  <div class="zl">${zs.map(z=>`<div class="zb" data-z="${z.id}"><i style="background:${z.color}"></i>${esc(z.name)} <em>${assetsIn(z.id).length}</em></div>`).join('')||'<span class="muted">이 도면에는 구역이 없습니다. 설정에서 구역을 추가하세요.</span>'}</div>`;
+  <div class="zl">${zs.map(z=>`<div class="zb" data-z="${z.id}"><i style="background:${z.color}"></i>${esc(z.name)} <em>${assetsIn(z.id).length}</em></div>`).join('')||'<span class="muted">이 도면에는 구역이 없습니다. 위의 ＋ 구역 추가를 눌러 추가하세요.</span>'}</div>`;
 }
 let pin={mx:0,my:0};
 function bindPinch(){
@@ -244,6 +244,17 @@ function bindPinch(){
   sc.addEventListener('touchmove',e=>{if(e.touches.length===2&&d0){e.preventDefault();apply(z0*dist(e.touches)/d0)}},{passive:false});
   sc.addEventListener('touchend',e=>{if(e.touches.length<2)d0=0});
   sc.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();anchor(e.clientX,e.clientY);apply(zoom*(e.deltaY<0?1.15:1/1.15))},{passive:false});
+}
+function edHtml(f){
+  return `<div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.tool==='circle'?'원의 중심에서 바깥으로 드래그하세요':'도면 위를 드래그하세요'}</span></div>
+  <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(f.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div></div></div>
+  <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">구역 추가</button></div>`;
+}
+function openZoneAdd(fid){st.edf=fid;resetEd();cur={t:'zadd',fid};drawZoneAdd()}
+function drawZoneAdd(){
+  const f=byId(D.f,cur.fid);if(!f){closeModal();return}
+  openOv('#ov',`<div class="box" style="max-width:900px"><div class="mh"><div><b>구역 추가</b><div class="muted">${esc(fpName(f))}</div></div><button class="x" onclick="closeModal()">✕</button></div><div class="mb">${edHtml(f)}</div></div>`);
+  bindEditor();
 }
 function setZoom(d){zoom=Math.max(1,Math.min(6,zoom+d));const s=$('#stage');if(s)s.style.width=zoom*100+'%'}
 function viewRef(f,b,ri){
@@ -466,7 +477,7 @@ function bindEditor(){
   sv.onpointerdown=e=>{e.preventDefault();ed.start=pct(e);ed.pts=[];sv.setPointerCapture(e.pointerId)};
   sv.onpointermove=e=>{if(ed.start){ed.pts=shape(e);drawEd()}};
   sv.onpointerup=()=>{if(ed.start){const xs=ed.pts.map(p=>p.x),ys=ed.pts.map(p=>p.y);ed.start=null;if(!xs.length||Math.max(...xs)-Math.min(...xs)<1||Math.max(...ys)-Math.min(...ys)<1)ed.pts=[];drawEd()}};
-  const tool=t=>{ed.tool=t;ed.pts=[];ed.start=null;render()};
+  const tool=t=>{ed.tool=t;ed.pts=[];ed.start=null;if(cur?.t==='zadd')drawZoneAdd();else render()};
   $('#trect').onclick=()=>tool('rect');$('#tcircle').onclick=()=>tool('circle');
   $('#tclr').onclick=()=>{ed.pts=[];drawEd()};
   $('#zc').onchange=drawEd;
@@ -480,7 +491,7 @@ function bindEditor(){
     const row={name,color:$('#zc').value,points:ed.pts};
     if(ed.zid)await q(sb.from('zones').update(row).eq('id',ed.zid));
     else await q(sb.from('zones').insert({...row,floorplan_id:st.edf}));
-    resetEd();await refresh();toast('구역을 저장했습니다.');
+    resetEd();if(cur?.t==='zadd')closeModal();await refresh();toast('구역을 저장했습니다.');
   });
   $('#app').querySelectorAll('[data-zed]').forEach(e=>e.onclick=()=>{const z=byId(D.z,e.dataset.zed);ed.zid=z.id;ed.pts=z.points.map(p=>({...p}));render(true).then(()=>$('#edst')?.scrollIntoView({block:'center'}))});
   $('#app').querySelectorAll('[data-zdel]').forEach(e=>e.onclick=()=>act(()=>delZone(e.dataset.zdel)));
@@ -497,7 +508,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014173646';
+const APP_VER='20261014173808';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
