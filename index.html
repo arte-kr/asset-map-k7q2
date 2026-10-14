@@ -66,6 +66,15 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .mb label{display:block;margin-bottom:10px;font-size:12px;color:var(--mu)}
 .mb label input,.mb label select{margin-top:4px;color:var(--tx);font-size:13px}
 .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.notice{background:#fff3cd;color:#664d03;border:1px solid #ffe69c;border-radius:var(--r);padding:10px 14px;margin-bottom:12px;cursor:pointer;font-size:13px}
+:root[data-theme=dark] .notice{background:#332f1f;color:#f1d98a;border-color:#5a5030}
+header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e5483f;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.arow{display:grid;grid-template-columns:minmax(0,1fr) 214px;gap:8px;align-items:center}
+.ai{display:grid;grid-template-columns:1fr 1fr 1.6fr 1fr;gap:8px;min-width:0;cursor:pointer;font-size:13px}
+.ai>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ah{padding:0 0 6px;font-size:12px;color:var(--hint);border-bottom:1px solid var(--bd)}.ah .ai{cursor:default;font-size:12px}
+.ba{display:flex;gap:4px;justify-content:flex-end;align-items:center}.ba select{width:96px;padding:5px 6px;font-size:12px}
+@media(max-width:640px){.arow{grid-template-columns:minmax(0,1fr)}.ba{justify-content:flex-start}.ah .ba{display:none}}
 .row{padding:10px 0;border-top:1px solid var(--bd)}
 .row:first-child{border-top:0}
 .rt{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
@@ -168,7 +177,7 @@ window.addEventListener('hashchange',()=>{zoom=1;render()});
 async function render(force){
   const [,r,id,idx]=location.hash.split('/');
   const top=$('#top'),app=$('#app');
-  const gear='<button onclick="go(\'#/s\')" class="ic" aria-label="설정" title="설정">'+ICON_GEAR+'</button>',list='<button class="ic" onclick="openPool()" aria-label="자산 검색" title="자산 검색">'+ICON_SEARCH+'</button>',tg=`<button class="ic" onclick="toggleTheme()" aria-label="다크/라이트 모드 전환" title="다크/라이트 모드 전환">${document.documentElement.dataset.theme==='dark'?ICON_SUN:ICON_MOON}</button>`;
+  const gear='<button onclick="go(\'#/s\')" class="ic" aria-label="설정" title="설정">'+ICON_GEAR+'</button>',list=`<button class="ic" onclick="openPool()" aria-label="자산 검색" title="자산 검색">${ICON_SEARCH}${unCount()?`<span class="cnt">${unCount()}</span>`:''}</button>`,tg=`<button class="ic" onclick="toggleTheme()" aria-label="다크/라이트 모드 전환" title="다크/라이트 모드 전환">${document.documentElement.dataset.theme==='dark'?ICON_SUN:ICON_MOON}</button>`;
   const home=`<button class="ic" onclick="go('#/')" aria-label="홈" title="홈">${ICON_HOME}</button>`;
   if(r==='r'&&byId(D.f,id)&&(byId(D.f,id).refs||[])[+idx]){
     const f=byId(D.f,id),b=byId(D.b,f.building_id),rf=f.refs[+idx];
@@ -191,7 +200,8 @@ async function render(force){
 /* ---------- 홈 ---------- */
 function viewHome(){
   if(!D.b.length)return `<div class="empty">등록된 건물이 없습니다.<br><br><button class="b1" onclick="go('#/s')">설정에서 건물 추가</button></div>`;
-  return `<div class="grid">${D.b.map(b=>`<div class="bcard" style="${b.color?`background:${b.color}`:''}" onclick="openBuilding('${b.id}')">${esc(b.name)}</div>`).join('')}</div>`;
+  const n=unCount();
+  return `${n?`<div class="notice" onclick="openPool('un')">구역이 없는 <b>미배정 자산 ${n}개</b>가 있습니다. 눌러서 확인하고 구역을 배정해 주세요.</div>`:''}<div class="grid">${D.b.map(b=>`<div class="bcard" style="${b.color?`background:${b.color}`:''}" onclick="openBuilding('${b.id}')">${esc(b.name)}</div>`).join('')}</div>`;
 }
 function openBuilding(id){
   const f=D.f.find(x=>x.building_id===id&&x.image_path);
@@ -248,57 +258,63 @@ function zoneOpts(except){
     return zs.length?`<optgroup label="${esc(b.name+' / '+f.name)}">${zs.map(z=>`<option value="${z.id}">${esc(z.name)}</option>`).join('')}</optgroup>`:''}).join('')).join('');
 }
 function openZone(zid){cur={t:'zone',id:zid};drawZone()}
-function assetRow(a,zid){
-  return `<div class="row" data-id="${a.id}"><div class="rt"><b>${esc(a.name)}</b><span class="muted">${esc([a.drawing_code&&'도면코드 '+a.drawing_code,a.asset_no,a.manager&&'관리 '+a.manager].filter(Boolean).join(' · '))}</span>${a.note?`<span class="muted">${esc(a.note)}</span>`:''}</div>
-  <div class="ra"><select data-mv><option value="">구역 이동…</option>${zoneOpts(zid)}</select><select data-st><option value="">상태 변경…</option>${STATUS.slice(1).map(s=>`<option>${s}</option>`).join('')}</select><button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></div><div class="hist" hidden></div></div>`;
+const zname=a=>byId(D.z,a.zone_id)?.name||(a.status!=='사용중'?a.status:'미배정');
+const aCols=a=>`<span>${esc(a.drawing_code||'')}</span><span>${esc(a.asset_no||'')}</span><b>${esc(a.name)}</b><span>${esc(zname(a))}</span>`;
+const aHead='<div class="arow ah"><div class="ai"><span>도면코드</span><span>자산번호</span><span>자산명</span><span>위치</span></div><span class="ba"></span></div>';
+const aDetail=a=>[a.detail_loc&&`상세위치 ${a.detail_loc}`,a.manager,a.note&&`비고 ${a.note}`].filter(Boolean).join(' · ')||'등록된 상세 정보가 없습니다.';
+function assetRow(a){
+  return `<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba"><button class="b3" data-mv>이동</button><button class="b3" data-st>상태</button><button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`;
 }
 function drawZone(){
   const z=byId(D.z,cur.id);if(!z){closeModal();return}
   const f=byId(D.f,z.floorplan_id),as=assetsIn(z.id);
   const o=openOv('#ov',`<div class="box"><div class="mh"><div><b>${esc(z.name)}</b><div class="muted">${esc(fpName(f))} · 자산 ${as.length}개</div></div><button class="x" onclick="closeModal()">✕</button></div>
-  <div class="mb"><div class="btns" style="margin:0 0 6px"><button class="b1" data-add>＋ 자산 등록</button></div>${as.map(a=>assetRow(a,z.id)).join('')||'<div class="empty">이 구역에 자산이 없습니다.</div>'}</div></div>`);
+  <div class="mb"><div class="btns" style="margin:0 0 6px"><button class="b1" data-add>＋ 자산 등록</button></div>${as.length?aHead+as.map(assetRow).join(''):'<div class="empty">이 구역에 자산이 없습니다.</div>'}</div></div>`);
   bindAssets(o,z.id);
 }
+function bindInfo(r,a){r.querySelector('[data-info]').onclick=()=>{const d=r.querySelector('.det');d.hidden=!d.hidden;if(!d.hidden)d.textContent=aDetail(a)}}
 function bindAssets(o,zid){
   o.querySelector('[data-add]')?.addEventListener('click',()=>addAsset(zid));
   o.querySelectorAll('.row').forEach(r=>{
-    const id=r.dataset.id;
-    r.querySelector('[data-mv]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>moveAsset(id,v))});
-    r.querySelector('[data-st]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>setStatus(id,v))});
+    const id=r.dataset.id;bindInfo(r,byId(D.a,id));
+    r.querySelector('[data-mv]')?.addEventListener('click',()=>act(()=>moveAsset(id)));
+    r.querySelector('[data-st]')?.addEventListener('click',()=>act(()=>setStatus(id)));
     r.querySelector('[data-ed]')?.addEventListener('click',()=>act(()=>editAsset(id)));
-    r.querySelector('[data-hi]')?.addEventListener('click',()=>act(()=>showHist(id,r.querySelector('.hist'))));
+    r.querySelector('[data-hi]')?.addEventListener('click',()=>act(()=>showHist(id,r.querySelector('.hh'))));
   });
 }
-async function moveAsset(id,zid){
-  const a=byId(D.a,id),z=byId(D.z,zid);
-  const v=await ask(`'${a.name}'을(를) '${z.name}'(으)로 이동`,[whoField()],'이동');if(!v)return;
-  const by=byOf(v);
-  await rpc('move_asset',{p_asset:id,p_zone:zid,p_by:by});await refresh();toast('이동했습니다.');
+const zoneList=ex=>D.z.filter(z=>z.id!==ex).map(z=>({v:z.id,t:`${fpName(byId(D.f,z.floorplan_id))} / ${z.name}`}));
+async function moveAsset(id){
+  const a=byId(D.a,id),opts=zoneList(a.zone_id);
+  if(!opts.length)throw new Error('이동할 다른 구역이 없습니다.');
+  const v=await ask(`'${a.name}' 이동`,[{k:'zone',label:'이동할 구역',type:'select',options:opts},whoField()],'이동');if(!v)return;
+  const by=byOf(v),z=byId(D.z,v.zone);
+  await rpc('move_asset',{p_asset:id,p_zone:v.zone,p_by:by});await refresh();toast(`'${z.name}'(으)로 이동했습니다.`);
 }
-async function setStatus(id,s){
+async function setStatus(id){
   const a=byId(D.a,id);
-  const v=await ask(`'${a.name}' 상태를 '${s}'(으)로 변경`,[{k:'note',label:'사유 (선택) — 구역 배정은 해제됩니다.'},whoField()],'변경');if(!v)return;
+  const v=await ask(`'${a.name}' 상태 변경`,[{k:'s',label:'변경할 상태 (구역 배정은 해제됩니다)',type:'select',options:STATUS.slice(1).map(s=>({v:s,t:s}))},{k:'note',label:'사유 (선택)'},whoField()],'변경');if(!v)return;
   const by=byOf(v);
-  await rpc('set_asset_status',{p_asset:id,p_status:s,p_by:by,p_note:v.note||null});await refresh();toast('상태를 변경했습니다.');
+  await rpc('set_asset_status',{p_asset:id,p_status:v.s,p_by:by,p_note:v.note||null});await refresh();toast('상태를 변경했습니다.');
 }
-const mgrField=a=>{const cur=a?.manager||'';return D.s.length?{k:'manager',label:'관리자',type:'select',value:cur,options:[{v:'',t:'(선택 안 함)'},...D.s.map(s=>({v:s.name,t:s.name})),...(cur&&!D.s.some(s=>s.name===cur)?[{v:cur,t:cur}]:[])]}:{k:'manager',label:'관리자',value:cur}};
 const zlabel=zid=>{const z=byId(D.z,zid),f=byId(D.f,z?.floorplan_id);return f?`${fpName(f)} / ${z.name}`:''};
-const assetFields=(a,zid)=>[{k:'code',label:'도면코드',value:a?.drawing_code},{k:'asset_no',label:'자산번호',value:a?.asset_no},{k:'name',label:'자산명 *',value:a?.name},
-  {k:'place',label:'자산위치',value:a?loc(a):zlabel(zid),ro:true},mgrField(a),{k:'note',label:'비고',value:a?.note}];
+const assetFields=a=>[{k:'code',label:'도면코드',value:a?.drawing_code},{k:'asset_no',label:'자산번호',value:a?.asset_no},{k:'name',label:'자산명 *',value:a?.name},
+  {k:'detail',label:'자산 상세위치',value:a?.detail_loc,ph:'예: 매표소 카운터 왼쪽'},{k:'manager',label:'관리자',value:a?.manager,ph:'이름'},{k:'note',label:'비고',value:a?.note}];
+const assetRowVals=v=>({name:v.name.trim(),drawing_code:v.code.trim()||null,asset_no:v.asset_no.trim()||null,detail_loc:v.detail.trim()||null,manager:v.manager.trim()||null,note:v.note.trim()||null});
 async function addAsset(zid){
-  const v=await ask('자산 등록',[...assetFields(null,zid),whoField()],'등록');if(!v)return;
+  const v=await ask(`자산 등록 · ${zlabel(zid)}`,[...assetFields(),whoField()],'등록');if(!v)return;
   if(!v.name.trim())return toast('자산명을 입력하세요.',true);
   let by;try{by=byOf(v)}catch(e){return toast(e.message,true)}
   await act(async()=>{
-    const a=await q(sb.from('assets').insert({name:v.name.trim(),drawing_code:v.code.trim()||null,asset_no:v.asset_no.trim()||null,manager:v.manager.trim()||null,note:v.note.trim()||null,zone_id:zid}).select().single());
+    const a=await q(sb.from('assets').insert({...assetRowVals(v),zone_id:zid}).select().single());
     await q(sb.from('asset_history').insert({asset_id:a.id,action:'등록',to_zone_name:byId(D.z,zid)?.name,changed_by:by}));
     await refresh();toast('자산을 등록했습니다.');
   });
 }
 async function editAsset(id){
-  const a=byId(D.a,id),v=await ask('자산 수정',assetFields(a),'저장');if(!v)return;
+  const a=byId(D.a,id),v=await ask(`자산 수정 · ${loc(a)}`,assetFields(a),'저장');if(!v)return;
   if(!v.name.trim())throw new Error('자산명을 입력하세요.');
-  await q(sb.from('assets').update({name:v.name.trim(),drawing_code:v.code.trim()||null,asset_no:v.asset_no.trim()||null,manager:v.manager.trim()||null,note:v.note.trim()||null,updated_at:new Date().toISOString()}).eq('id',id));
+  await q(sb.from('assets').update({...assetRowVals(v),updated_at:new Date().toISOString()}).eq('id',id));
   await refresh();toast('저장했습니다.');
 }
 async function showHist(id,el){
@@ -311,27 +327,28 @@ async function showHist(id,el){
 }
 
 /* ---------- 자산 목록 (검색 / 미배정·종료) ---------- */
-function openPool(){cur={t:'pool',qs:'',f:'all'};drawPool()}
+const unCount=()=>D.a.filter(a=>a.status==='사용중'&&!a.zone_id).length;
+function openPool(m){cur={t:'pool',qs:'',f:m==='un'?'un':'all'};drawPool()}
 function loc(a){
   const z=byId(D.z,a.zone_id);if(!z)return a.status==='사용중'?'미배정':a.status;
   return fpName(byId(D.f,z.floorplan_id))+' / '+z.name;
 }
 function drawPool(){
   const k=cur.qs.trim().toLowerCase();
-  const as=D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.drawing_code,a.asset_no,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k)));
-  const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색 · ${as.length}개</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
-  <div class="fr"><input id="pq" placeholder="자산명·번호·관리자·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
-  ${as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="rt"><b>${esc(a.name)}</b><span class="muted">${esc([a.drawing_code&&'도면코드 '+a.drawing_code,a.asset_no,a.manager&&'관리 '+a.manager].filter(Boolean).join(' · '))}</span><span class="muted">위치: ${esc(loc(a))}${a.zone_id?'':` · 상태: ${esc(a.status)}`}</span></div>
-  <div class="ra">${a.zone_id?`<button class="b3" data-go>구역 열기</button>`:`<select data-as><option value="">구역 배정…</option>${zoneOpts()}</select>`}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></div><div class="hist" hidden></div></div>`).join('')||'<div class="empty">해당하는 자산이 없습니다.</div>'}</div></div>`);
+  const idle=!k&&cur.f==='all';
+  const as=idle?[]:D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k)));
+  const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색${idle?'':` · ${as.length}개`}</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
+  <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
+  ${as.length?aHead+as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':`<select data-as><option value="">구역 배정…</option>${zoneOpts()}</select>`}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
   const qi=o.querySelector('#pq');
   qi.oninput=()=>{cur.qs=qi.value;clearTimeout(drawPool.t);drawPool.t=setTimeout(()=>{drawPool();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
   o.querySelector('#pf').onchange=e=>{cur.f=e.target.value;drawPool()};
   o.querySelectorAll('.row').forEach(r=>{
-    const id=r.dataset.id,a=byId(D.a,id);
+    const id=r.dataset.id,a=byId(D.a,id);bindInfo(r,a);
     r.querySelector('[data-go]')?.addEventListener('click',()=>openZone(a.zone_id));
     r.querySelector('[data-as]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>assignAsset(id,v))});
     r.querySelector('[data-ed]').onclick=()=>act(()=>editAsset(id));
-    r.querySelector('[data-hi]').onclick=()=>act(()=>showHist(id,r.querySelector('.hist')));
+    r.querySelector('[data-hi]').onclick=()=>act(()=>showHist(id,r.querySelector('.hh')));
   });
 }
 async function assignAsset(id,zid){
