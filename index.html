@@ -493,6 +493,24 @@ async function delZone(id){
   await refresh();toast(c>0?`구역을 삭제했습니다. 자산 ${c}개는 미배정입니다.`:'구역을 삭제했습니다.');
 }
 
+/* ---------- 새 버전 자동 확인 ---------- */
+const APP_VER='20261014172946';
+async function checkUpdate(){
+  try{
+    const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
+    const m=(await r.text()).match(/const APP_VER='(\d+)'/);
+    if(!m||m[1]===APP_VER)return;
+    if(sessionStorage.getItem('asset_upd')===m[1])return;
+    if(!$('#ov').hidden||!$('#ov2').hidden||ed.pts.length)return setTimeout(checkUpdate,30000);
+    sessionStorage.setItem('asset_upd',m[1]);
+    await fetch(location.pathname,{cache:'reload'});
+    toast('새 버전으로 업데이트합니다…');
+    setTimeout(()=>location.reload(),600);
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
+setInterval(checkUpdate,300000);
+
 /* ---------- 시작 ---------- */
 async function refresh(){
   await load();
@@ -504,7 +522,7 @@ function live(){
   sb.channel('asset-live').on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rt);rt=setTimeout(()=>act(refresh),400)}).subscribe();
 }
 (async()=>{
-  try{await load();await render();live()}
+  try{await load();await render();live();checkUpdate()}
   catch(e){$('#app').innerHTML=`<div class="empty">데이터를 불러오지 못했습니다.<br>${esc(e.message||e)}</div>`}
 })();
 </script>
