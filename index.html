@@ -49,12 +49,13 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .stage svg{position:absolute;inset:0;width:100%;height:100%}
 .stage polygon{cursor:pointer;stroke-width:1.6;vector-effect:non-scaling-stroke}
 .ed svg{touch-action:none;cursor:crosshair}
+.cn{display:inline-block;margin-left:4px;background:#1a1917;color:#fff;border-radius:8px;min-width:16px;padding:0 5px;font-size:10px;line-height:16px;text-shadow:none;vertical-align:middle}
 .lb{position:absolute;transform:translate(-50%,-50%);font-size:11px;line-height:1.25;text-align:center;pointer-events:none;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;font-weight:700;white-space:nowrap}
 .zl{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .zb{display:flex;align-items:center;gap:6px;padding:6px 11px;background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:5px;cursor:pointer;font-size:13px}
 .zb:hover{border-color:var(--hint)}
 .zb i{width:11px;height:11px;border-radius:3px;display:inline-block}
-.zb em{font-style:normal;color:var(--hint);font-size:12px}
+.zb{white-space:nowrap}.zb em{font-style:normal;color:var(--hint);font-size:12px}
 #ov,#ov2{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}
 #ov2{z-index:30}
 [hidden]{display:none!important}
@@ -215,7 +216,7 @@ function openBuilding(id){
 }
 
 /* ---------- 도면 보기 ---------- */
-function labels(zs){return zs.map(z=>{const c=center(z.points);return `<div class="lb" style="left:${c.x}%;top:${c.y}%">${esc(z.name)}<br>${assetsIn(z.id).length}</div>`}).join('')}
+function labels(zs){return zs.map(z=>{const c=center(z.points);return `<div class="lb" style="left:${c.x}%;top:${c.y}%">${esc(z.name)}<span class="cn">${assetsIn(z.id).length}</span></div>`}).join('')}
 function chipRow(f,fps,ri){
   const cr=ri!=null,refs=f.refs||[];
   const c=(x,on,l)=>`<div class="chip ${on?'on':''}" onclick="go('#/f/${x.id}')">${esc(l)}</div>`;
@@ -494,7 +495,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014172946';
+const APP_VER='20261014173123';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
