@@ -201,7 +201,7 @@ async function render(force){
 function viewHome(){
   if(!D.b.length)return `<div class="empty">등록된 건물이 없습니다.<br><br><button class="b1" onclick="go('#/s')">설정에서 건물 추가</button></div>`;
   const n=unCount();
-  return `${n?`<div class="notice" onclick="openPool('un')">구역이 없는 <b>미배정 자산 ${n}개</b>가 있습니다. 눌러서 확인하고 구역을 배정해 주세요.</div>`:''}<div class="grid">${D.b.map(b=>`<div class="bcard" style="${b.color?`background:${b.color}`:''}" onclick="openBuilding('${b.id}')">${esc(b.name)}</div>`).join('')}</div>`;
+  return `${n?`<div class="notice" onclick="openPool('un')"><b>미배정 자산 ${n}개</b>가 있습니다. 자산 배정을 완료해 주세요.</div>`:''}<div class="grid">${D.b.map(b=>`<div class="bcard" style="${b.color?`background:${b.color}`:''}" onclick="openBuilding('${b.id}')">${esc(b.name)}</div>`).join('')}</div>`;
 }
 function openBuilding(id){
   const f=D.f.find(x=>x.building_id===id&&x.image_path);
