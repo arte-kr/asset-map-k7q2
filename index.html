@@ -202,7 +202,19 @@ async function render(force){
     top.innerHTML=`<h1>자산관리</h1>${tg}${list}${gear}`;
     app.innerHTML=viewHome();
   }
+  fitChips();
 }
+function fitChips(){
+  const cs=[...document.querySelectorAll('#app .chips .chip')];
+  if(!cs.length)return;
+  const box=document.createElement('div');box.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap';
+  [...D.b.map(b=>b.name),...D.f.map(f=>f.name),'도면코드'].forEach(t=>{const e=document.createElement('div');e.className='chip';e.textContent=t;box.appendChild(e)});
+  document.body.appendChild(box);
+  const m=Math.max(0,...[...box.children].map(e=>e.offsetWidth));
+  box.remove();
+  cs.forEach(c=>{c.style.minWidth=m+'px';c.style.textAlign='center'});
+}
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>fitChips());
 
 /* ---------- 홈 ---------- */
 function viewHome(){
@@ -320,10 +332,20 @@ function bindAssets(o,zid){
   });
 }
 const zoneList=ex=>D.z.filter(z=>z.id!==ex).map(z=>({v:z.id,t:`${fpName(byId(D.f,z.floorplan_id))} / ${z.name}`}));
+async function pickZone(title,exceptZid,ok){
+  const bz={};
+  D.z.filter(z=>z.id!==exceptZid).forEach(z=>{const f=byId(D.f,z.floorplan_id);if(!f)return;const multi=D.f.filter(x=>x.building_id===f.building_id).length>1;(bz[f.building_id]=bz[f.building_id]||[]).push({v:z.id,t:(multi?f.name+' / ':'')+z.name})});
+  const bl=D.b.filter(b=>bz[b.id]);
+  if(!bl.length)throw new Error('선택할 수 있는 구역이 없습니다.');
+  const cz=byId(D.z,exceptZid),curB=byId(D.f,cz?.floorplan_id)?.building_id,first=bz[curB]?curB:bl[0].id;
+  return ask(title,[{k:'bld',label:'건물',type:'select',value:first,options:bl.map(b=>({v:b.id,t:b.name}))},{k:'zone',label:'구역',type:'select',options:bz[first]},whoField()],ok,fm=>{
+    const bs=fm.querySelector('[name=bld]'),zs=fm.querySelector('[name=zone]');
+    bs.onchange=()=>{zs.innerHTML=bz[bs.value].map(o=>`<option value="${o.v}">${esc(o.t)}</option>`).join('')};
+  });
+}
 async function moveAsset(id){
-  const a=byId(D.a,id),opts=zoneList(a.zone_id);
-  if(!opts.length)throw new Error('이동할 다른 구역이 없습니다.');
-  const v=await ask(`'${a.name}' 이동`,[{k:'zone',label:'이동할 구역',type:'select',options:opts},whoField()],'이동');if(!v)return;
+  const a=byId(D.a,id);
+  const v=await pickZone(`'${a.name}' 이동`,a.zone_id,'이동');if(!v)return;
   const by=byOf(v),z=byId(D.z,v.zone);
   await rpc('move_asset',{p_asset:id,p_zone:v.zone,p_by:by});await refresh();toast(`'${z.name}'(으)로 이동했습니다.`);
 }
@@ -375,7 +397,7 @@ function drawPool(){
   const as=idle?[]:sortAssets(D.a.filter(a=>(cur.f==='all'||!a.zone_id||a.status!=='사용중')&&(!k||[a.name,a.drawing_code,a.asset_no,a.detail_loc,a.manager,loc(a),a.note].join(' ').toLowerCase().includes(k))));
   const o=openOv('#ov',`<div class="box"><div class="mh"><b>자산 검색${idle?'':` · ${as.length}개`}</b><button class="x" onclick="closeModal()">✕</button></div><div class="mb">
   <div class="fr"><input id="pq" placeholder="자산명·번호·도면코드·위치 검색" value="${esc(cur.qs)}"><select id="pf" style="flex:0 0 150px"><option value="all">전체</option><option value="un" ${cur.f==='un'?'selected':''}>미배정·종료만</option></select></div>
-  ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':`<select data-as><option value="">구역 배정…</option>${zoneOpts()}</select>`}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
+  ${as.length?aHead()+as.slice(0,200).map(a=>`<div class="row" data-id="${a.id}"><div class="arow"><div class="ai" data-info title="눌러서 상세 보기">${aCols(a)}</div><span class="ba">${a.zone_id?'<button class="b3" data-go>구역</button>':'<button class="b3" data-as>구역 배정</button>'}<button class="b3" data-ed>수정</button><button class="b3" data-hi>이력</button></span></div><div class="hist det" hidden></div><div class="hist hh" hidden></div></div>`).join(''):`<div class="empty">${idle?'검색어를 입력하세요.':'해당하는 자산이 없습니다.'}</div>`}</div></div>`);
   bindSort(o);
   const qi=o.querySelector('#pq');
   qi.oninput=()=>{cur.qs=qi.value;clearTimeout(drawPool.t);drawPool.t=setTimeout(()=>{drawPool();const n=$('#pq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)};
@@ -383,17 +405,17 @@ function drawPool(){
   o.querySelectorAll('.row').forEach(r=>{
     const id=r.dataset.id,a=byId(D.a,id);bindInfo(r,a);
     r.querySelector('[data-go]')?.addEventListener('click',()=>openZoneFromPool(a.zone_id));
-    r.querySelector('[data-as]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>assignAsset(id,v))});
+    r.querySelector('[data-as]')?.addEventListener('click',()=>act(()=>assignAsset(id)));
     r.querySelector('[data-ed]').onclick=()=>act(()=>editAsset(id));
     r.querySelector('[data-hi]').onclick=()=>act(()=>showHist(id,r.querySelector('.hh')));
   });
 }
-async function assignAsset(id,zid){
-  const a=byId(D.a,id),z=byId(D.z,zid);
-  const v=await ask(`'${a.name}'을(를) '${z.name}'에 배정`+(a.status!=='사용중'?` (상태가 '${a.status}'에서 '사용중'으로 바뀝니다)`:''),[whoField()],'배정');if(!v)return;
+async function assignAsset(id){
+  const a=byId(D.a,id);
+  const v=await pickZone(`'${a.name}' 구역 배정`+(a.status!=='사용중'?` (상태가 '${a.status}'에서 '사용중'으로 바뀝니다)`:''),null,'배정');if(!v)return;
   const by=byOf(v);
   if(a.status!=='사용중')await rpc('set_asset_status',{p_asset:id,p_status:'사용중',p_by:by,p_note:'구역 재배정'});
-  await rpc('move_asset',{p_asset:id,p_zone:zid,p_by:by});await refresh();toast('배정했습니다.');
+  await rpc('move_asset',{p_asset:id,p_zone:v.zone,p_by:by});await refresh();toast('배정했습니다.');
 }
 
 /* ---------- 설정 ---------- */
@@ -509,7 +531,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014173959';
+const APP_VER='20261014174240';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
