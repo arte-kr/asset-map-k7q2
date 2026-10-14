@@ -73,7 +73,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .notice{background:#fff3cd;color:#664d03;border:1px solid #ffe69c;border-radius:var(--r);padding:10px 14px;margin-bottom:12px;cursor:pointer;font-size:13px}
 :root[data-theme=dark] .notice{background:#332f1f;color:#f1d98a;border-color:#5a5030}
 header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e5483f;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.arow{display:grid;grid-template-columns:minmax(0,1fr) 214px;gap:8px;align-items:center}
+.arow{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:8px;align-items:center}
 .ai{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;min-width:0;cursor:pointer;font-size:13px}
 .row.ar{margin:0 -16px;padding:10px 16px 10px 20px;box-shadow:inset 4px 0 0 var(--sc,transparent)}.ar.sc-ok{--sc:#00B050}.ar.sc-wn{--sc:#F59E0B}.ar.sc-er{--sc:#FF0000}.ar.sc-in{--sc:#185EA5}.ar.sc-ex{--sc:#534AB7}
 .ah{padding-left:20px!important}
@@ -81,7 +81,7 @@ header .ic{position:relative}.cnt{position:absolute;top:-5px;right:-5px;min-widt
 .ai>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .ah{margin:0 -16px;padding:9px 16px;background:var(--tag);color:var(--tx);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd)}.ah .ai{cursor:default;font-size:13px;font-weight:700}
 .ah [data-sort]{cursor:pointer;user-select:none}.ah [data-sort]:hover{text-decoration:underline}
-.ba{display:flex;gap:4px;justify-content:flex-end;align-items:center}.ba select{width:96px;padding:5px 6px;font-size:12px}
+.ba{display:flex;gap:4px;justify-content:flex-end;align-items:center}.ba .b3{white-space:nowrap;flex-shrink:0}.ba select{width:96px;padding:5px 6px;font-size:12px}
 @media(max-width:640px){.arow{grid-template-columns:minmax(0,1fr)}.ba{justify-content:flex-start}.ah .ba{display:none}}
 .row{padding:10px 0;border-top:1px solid var(--bd)}
 .row:first-child{border-top:0}
@@ -544,7 +544,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014180455';
+const APP_VER='20261014180650';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
