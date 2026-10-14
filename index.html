@@ -72,7 +72,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .ra select{width:auto;flex:1;min-width:120px;padding:5px 8px;font-size:12px}
 .hist{margin-top:8px;font-size:12px;color:var(--mu);background:var(--soft);border:1px solid var(--bd);border-radius:5px;padding:8px 10px;line-height:1.7}
 .sec{margin-bottom:14px}
-.sec h2{font-size:13px;font-weight:700;margin:-14px -16px 12px;padding:9px 16px;background:var(--dark2);color:#fff;letter-spacing:.2px}
+.sec h2{font-size:13px;font-weight:700;margin:-14px -16px 12px;padding:9px 16px;background:var(--dark2);color:#fff;letter-spacing:.2px;border-radius:6px 6px 0 0}
 .fr{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .fr>*{flex:1;min-width:130px}.fr>button{flex:0 0 auto}
 .li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--bd);flex-wrap:wrap}
@@ -100,7 +100,7 @@ const COLORS=['#378ADD','#1D9E75','#D85A30','#7F77DD','#BA7517','#D4537E','#6399
 const sb=supabase.createClient(SB_URL,SB_KEY);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let D={b:[],f:[],z:[],a:[]};
+let D={b:[],f:[],z:[],a:[],s:[]};
 let cur=null;
 let zoom=1;
 const st={fpb:null,edf:null};
@@ -122,31 +122,29 @@ async function q(p){const r=await p;if(r.error)throw r.error;return r.data}
 
 async function load(){
   const s=t=>sb.from(t).select('*').order('created_at');
-  const r=await Promise.all([sb.from('buildings').select('*').order('sort').order('created_at'),sb.from('floorplans').select('*').order('sort').order('created_at'),s('zones'),s('assets')]);
+  const r=await Promise.all([sb.from('buildings').select('*').order('sort').order('created_at'),sb.from('floorplans').select('*').order('sort').order('created_at'),s('zones'),s('assets'),sb.from('staff').select('*').order('sort').order('created_at')]);
   for(const x of r)if(x.error)throw x.error;
-  [D.b,D.f,D.z,D.a]=r.map(x=>x.data);
+  [D.b,D.f,D.z,D.a,D.s]=r.map(x=>x.data);
 }
 
 function openOv(id,html){const o=$(id);o.hidden=false;o.innerHTML=html;return o}
 function closeModal(){$('#ov').hidden=true;$('#ov').innerHTML='';cur=null}
-function ask(title,fields=[],ok='확인'){
+function ask(title,fields=[],ok='확인',mount){
   return new Promise(res=>{
     const f=fields.map(x=>`<label>${esc(x.label)}${x.type==='select'
-      ?`<select name="${x.k}">${x.options.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('')}</select>`
-      :`<input name="${x.k}" type="${x.type||'text'}" value="${esc(x.value||'')}" placeholder="${esc(x.ph||'')}" autocomplete="off">`}</label>`).join('');
+      ?`<select name="${x.k}">${x.options.map(o=>`<option value="${esc(o.v)}"${o.v===x.value?' selected':''}>${esc(o.t)}</option>`).join('')}</select>`
+      :`<input name="${x.k}" type="${x.type||'text'}" value="${esc(x.value||'')}" placeholder="${esc(x.ph||'')}" autocomplete="off"${x.ro?' readonly style="background:var(--soft);color:var(--hint)"':''}>`}</label>`).join('');
     const o=openOv('#ov2',`<div class="box sm"><div class="mh"><b>${esc(title)}</b></div><form class="mb">${f}<div class="btns"><button type="button" class="b2" id="c">취소</button><button class="b1">${esc(ok)}</button></div></form></div>`);
-    const fm=o.querySelector('form');fm.querySelector('input,select')?.focus();
+    const fm=o.querySelector('form');fm.querySelector('input:not([readonly]),select')?.focus();if(mount)mount(fm);
     const done=v=>{o.hidden=true;o.innerHTML='';res(v)};
     fm.onsubmit=e=>{e.preventDefault();done(Object.fromEntries(new FormData(fm)))};
     o.querySelector('#c').onclick=()=>done(null);
   });
 }
 const confirmBox=(m,ok)=>ask(m,[],ok).then(v=>v!==null);
-async function who(){
-  let n=localStorage.getItem('asset_user');
-  if(!n){const v=await ask('작업자 이름',[{k:'n',label:'변경 이력에 기록되며 이 기기에 저장됩니다.',ph:'홍길동'}]);if(!v||!v.n.trim())return null;n=v.n.trim();localStorage.setItem('asset_user',n)}
-  return n;
-}
+const whoField=()=>{const last=localStorage.getItem('asset_user')||'';
+  return D.s.length?{k:'by',label:'작업자',type:'select',value:last,options:D.s.map(s=>({v:s.name,t:s.name}))}:{k:'by',label:'작업자 (설정에서 직원 명단을 등록하면 선택할 수 있습니다)',value:last,ph:'이름'}};
+const byOf=v=>{const n=(v.by||'').trim();if(!n)throw new Error('작업자를 선택하세요.');try{localStorage.setItem('asset_user',n)}catch(e){}return n};
 
 /* ---------- 라우팅 ---------- */
 const SVG_O='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
@@ -236,24 +234,28 @@ function bindAssets(o,zid){
 }
 async function moveAsset(id,zid){
   const a=byId(D.a,id),z=byId(D.z,zid);
-  if(!await confirmBox(`'${a.name}'을(를) '${z.name}'(으)로 이동할까요?`,'이동'))return;
-  const by=await who();if(!by)return;
+  const v=await ask(`'${a.name}'을(를) '${z.name}'(으)로 이동`,[whoField()],'이동');if(!v)return;
+  const by=byOf(v);
   await rpc('move_asset',{p_asset:id,p_zone:zid,p_by:by});await refresh();toast('이동했습니다.');
 }
 async function setStatus(id,s){
   const a=byId(D.a,id);
-  const v=await ask(`'${a.name}' 상태를 '${s}'(으)로 변경`,[{k:'note',label:'사유 (선택) — 구역 배정은 해제됩니다.'}],'변경');if(!v)return;
-  const by=await who();if(!by)return;
+  const v=await ask(`'${a.name}' 상태를 '${s}'(으)로 변경`,[{k:'note',label:'사유 (선택) — 구역 배정은 해제됩니다.'},whoField()],'변경');if(!v)return;
+  const by=byOf(v);
   await rpc('set_asset_status',{p_asset:id,p_status:s,p_by:by,p_note:v.note||null});await refresh();toast('상태를 변경했습니다.');
 }
-const assetFields=a=>[{k:'name',label:'자산명 *',value:a?.name},{k:'asset_no',label:'자산번호',value:a?.asset_no},{k:'manager',label:'관리자',value:a?.manager},{k:'note',label:'비고',value:a?.note}];
+const mgrField=a=>{const cur=a?.manager||'';return D.s.length?{k:'manager',label:'관리자',type:'select',value:cur,options:[{v:'',t:'(선택 안 함)'},...D.s.map(s=>({v:s.name,t:s.name})),...(cur&&!D.s.some(s=>s.name===cur)?[{v:cur,t:cur}]:[])]}:{k:'manager',label:'관리자',value:cur}};
+const fpCode=zid=>byId(D.f,byId(D.z,zid)?.floorplan_id)?.code||'';
+const zoneList=()=>D.z.map(z=>{const f=byId(D.f,z.floorplan_id);return{v:z.id,t:`${f?fpName(f):''} / ${z.name}`}});
+const assetFields=(a,zid)=>[{k:'code',label:'도면코드',value:fpCode(a?a.zone_id:zid),ro:true},{k:'asset_no',label:'자산번호',value:a?.asset_no},{k:'name',label:'자산명 *',value:a?.name},
+  a?{k:'place',label:'자산위치',value:loc(a),ro:true}:{k:'zone',label:'자산위치',type:'select',value:zid,options:zoneList()},mgrField(a),{k:'note',label:'비고',value:a?.note}];
 async function addAsset(zid){
-  const v=await ask('자산 등록',assetFields(),'등록');if(!v)return;
+  const v=await ask('자산 등록',[...assetFields(null,zid),whoField()],'등록',fm=>{const s=fm.querySelector('[name=zone]'),c=fm.querySelector('[name=code]');s.onchange=()=>{c.value=fpCode(s.value)}});if(!v)return;
   if(!v.name.trim())return toast('자산명을 입력하세요.',true);
-  const by=await who();if(!by)return;
+  let by;try{by=byOf(v)}catch(e){return toast(e.message,true)}
   await act(async()=>{
-    const a=await q(sb.from('assets').insert({name:v.name.trim(),asset_no:v.asset_no.trim()||null,manager:v.manager.trim()||null,note:v.note.trim()||null,zone_id:zid}).select().single());
-    await q(sb.from('asset_history').insert({asset_id:a.id,action:'등록',to_zone_name:byId(D.z,zid)?.name,changed_by:by}));
+    const a=await q(sb.from('assets').insert({name:v.name.trim(),asset_no:v.asset_no.trim()||null,manager:v.manager.trim()||null,note:v.note.trim()||null,zone_id:v.zone}).select().single());
+    await q(sb.from('asset_history').insert({asset_id:a.id,action:'등록',to_zone_name:byId(D.z,v.zone)?.name,changed_by:by}));
     await refresh();toast('자산을 등록했습니다.');
   });
 }
@@ -298,8 +300,8 @@ function drawPool(){
 }
 async function assignAsset(id,zid){
   const a=byId(D.a,id),z=byId(D.z,zid);
-  if(!await confirmBox(`'${a.name}'을(를) '${z.name}'에 배정할까요?`+(a.status!=='사용중'?` (상태가 '${a.status}'에서 '사용중'으로 바뀝니다)`:''),'배정'))return;
-  const by=await who();if(!by)return;
+  const v=await ask(`'${a.name}'을(를) '${z.name}'에 배정`+(a.status!=='사용중'?` (상태가 '${a.status}'에서 '사용중'으로 바뀝니다)`:''),[whoField()],'배정');if(!v)return;
+  const by=byOf(v);
   if(a.status!=='사용중')await rpc('set_asset_status',{p_asset:id,p_status:'사용중',p_by:by,p_note:'구역 재배정'});
   await rpc('move_asset',{p_asset:id,p_zone:zid,p_by:by});await refresh();toast('배정했습니다.');
 }
@@ -311,15 +313,14 @@ async function viewSettings(){
   const fps=D.f.filter(f=>f.building_id===fpb);
   const edf=st.edf&&byId(D.f,st.edf)?st.edf:D.f[0]?.id;st.edf=edf;
   const zs=edf?zonesOf(edf):[];
-  const user=localStorage.getItem('asset_user')||'';
   return `
-  <div class="card sec"><h2>작업자 이름</h2><div class="fr"><input id="un" value="${esc(user)}" placeholder="변경 이력에 기록될 이름"><button class="b2" id="unb">저장</button></div></div>
   <div class="card sec"><h2>건물</h2>${D.b.map(b=>`<div class="li"><span>${esc(b.name)}</span><span class="sw" title="배지 색">${SW.map(c=>`<i data-bc="${b.id}" data-c="${c}" class="${(b.color||'')===c?'on':''}" style="background:${c||'var(--bcard)'}"></i>`).join('')}</span><button class="b3" data-bren="${b.id}">이름 변경</button><button class="b3 dg" data-bdel="${b.id}">삭제</button></div>`).join('')||'<div class="muted">등록된 건물이 없습니다.</div>'}
   <div class="fr" style="margin-top:10px"><input id="bn" placeholder="새 건물 이름"><button class="b1" id="bad">건물 추가</button></div></div>
   <div class="card sec"><h2>도면</h2>
   ${D.b.length?`<select id="fpb" style="margin-bottom:8px">${D.b.map(b=>`<option value="${b.id}" ${b.id===fpb?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
-  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${f.image_path?'':'이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><button class="b3 dg" data-fdel="${f.id}">삭제</button></div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
+  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${f.code!==f.name?esc(f.code)+' ':''}${f.image_path?'':'이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><button class="b3" data-fren="${f.id}">이름·코드</button><button class="b3 dg" data-fdel="${f.id}">삭제</button></div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
   <div style="margin-top:12px" class="muted">도면 추가</div>
+  <div class="fr"><input id="fn" placeholder="도면명 (선택) 예: 전시장 2층"><input id="fc" placeholder="도면코드 (선택) 도면에 적힌 코드, 예: TF-0-02"></div>
   <div class="fr"><input id="ff" type="file" accept="image/*"><button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>구역</h2>
   ${D.f.length?`<select id="edf" style="margin-bottom:8px">${D.f.map(f=>`<option value="${f.id}" ${f.id===edf?'selected':''}>${esc(fpName(f))}</option>`).join('')}</select>
@@ -327,12 +328,15 @@ async function viewSettings(){
   <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(byId(D.f,edf)?.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div></div></div>
   <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">${ed.zid?'수정 저장':'구역 추가'}</button>${ed.zid?'<button class="b2" id="znew">취소</button>':''}</div>
   ${zs.map(z=>`<div class="li"><span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${z.color}"></i> ${esc(z.name)} <span class="muted">자산 ${assetsIn(z.id).length}</span></span><button class="b3" data-zed="${z.id}">수정</button><button class="b3 dg" data-zdel="${z.id}">삭제</button></div>`).join('')}`:'<div class="muted">먼저 도면을 추가하세요.</div>'}</div>
+  <div class="card sec"><h2>직원 명단</h2>${D.s.map(s=>`<div class="li"><span>${esc(s.name)}</span><button class="b3 dg" data-sdel="${s.id}">삭제</button></div>`).join('')||'<div class="muted">등록된 직원이 없습니다. 이름을 추가하면 자산 이동·등록 때 작업자와 관리자를 선택할 수 있습니다.</div>'}
+  <div class="fr" style="margin-top:10px"><input id="sn" placeholder="직원 이름"><button class="b1" id="sad">직원 추가</button></div></div>
   <div class="card sec"><h2>삭제 암호</h2><div class="muted" style="margin-bottom:8px">자산이 있는 구역을 삭제할 때 필요합니다. ${has?'암호가 설정되어 있습니다.':'<b style="color:var(--dg)">아직 설정되지 않았습니다.</b>'}</div>
   <div class="fr">${has?'<input id="pwo" type="password" placeholder="기존 암호">':''}<input id="pwn" type="password" placeholder="새 암호 (4자 이상)"><button class="b1" id="pwb">${has?'암호 변경':'암호 설정'}</button></div></div>`;
 }
 function bindSettings(){
   const A=$('#app'),on=(s,fn)=>{const e=A.querySelector(s);if(e)e.onclick=()=>act(fn)};
-  on('#unb',async()=>{const v=$('#un').value.trim();if(!v)throw new Error('이름을 입력하세요.');localStorage.setItem('asset_user',v);toast('저장했습니다.')});
+  on('#sad',async()=>{const n=$('#sn').value.trim();if(!n)throw new Error('직원 이름을 입력하세요.');await q(sb.from('staff').insert({name:n,sort:D.s.length+1}));await refresh()});
+  A.querySelectorAll('[data-sdel]').forEach(e=>e.onclick=()=>act(async()=>{const s=byId(D.s,e.dataset.sdel);if(!await confirmBox(`직원 '${s.name}'을(를) 명단에서 삭제할까요? 이미 남은 변경 이력은 그대로 유지됩니다.`,'삭제'))return;await q(sb.from('staff').delete().eq('id',s.id));await refresh()}));
   on('#bad',async()=>{const n=$('#bn').value.trim();if(!n)throw new Error('건물 이름을 입력하세요.');await q(sb.from('buildings').insert({name:n,sort:D.b.length+1}));await refresh()});
   A.querySelectorAll('[data-bc]').forEach(e=>e.onclick=()=>act(async()=>{await q(sb.from('buildings').update({color:e.dataset.c||null}).eq('id',e.dataset.bc));await refresh()}));
   A.querySelectorAll('[data-bren]').forEach(e=>e.onclick=()=>act(async()=>{const b=byId(D.b,e.dataset.bren),v=await ask('건물 이름 변경',[{k:'n',label:'이름',value:b.name}]);if(!v||!v.n.trim())return;await q(sb.from('buildings').update({name:v.n.trim()}).eq('id',b.id));await refresh()}));
@@ -341,11 +345,13 @@ function bindSettings(){
   on('#fad',async()=>{
     const file=$('#ff').files[0];
     if(!file)throw new Error('도면 이미지 파일을 선택하세요.');
-    const bn=byId(D.b,st.fpb).name,n=D.f.filter(f=>f.building_id===st.fpb).length,name=n?`${bn} ${n+1}`:bn;let code=name;while(D.f.some(f=>f.code===code))code+='-'+Math.floor(Math.random()*90+10);
+    const bn=byId(D.b,st.fpb).name,n=D.f.filter(f=>f.building_id===st.fpb).length,name=$('#fn').value.trim()||(n?`${bn} ${n+1}`:bn);let code=$('#fc').value.trim();
+    if(code){if(D.f.some(f=>f.code===code))throw new Error('같은 도면코드가 이미 있습니다.')}else{code=name;while(D.f.some(f=>f.code===code))code+='-'+Math.floor(Math.random()*90+10)}
     const path=await upload(file,code);
     await q(sb.from('floorplans').insert({building_id:st.fpb,code,name,image_path:path,sort:D.f.length+1}));await refresh();toast('도면을 추가했습니다.');
   });
   A.querySelectorAll('[data-fimg]').forEach(e=>e.onchange=()=>act(async()=>{const f=byId(D.f,e.dataset.fimg),file=e.files[0];if(!file)return;const path=await upload(file,f.code);await q(sb.from('floorplans').update({image_path:path}).eq('id',f.id));await refresh();toast('이미지를 교체했습니다.')}));
+  A.querySelectorAll('[data-fren]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fren),v=await ask('도면명·도면코드',[{k:'name',label:'도면명',value:f.name},{k:'code',label:'도면코드 (도면에 적힌 코드)',value:f.code}]);if(!v||!v.name.trim())return;const code=v.code.trim()||v.name.trim();if(D.f.some(x=>x.id!==f.id&&x.code===code))throw new Error('같은 도면코드가 이미 있습니다.');await q(sb.from('floorplans').update({name:v.name.trim(),code}).eq('id',f.id));await refresh()}));
   A.querySelectorAll('[data-fdel]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fdel);if(zonesOf(f.id).length)throw new Error('구역이 있는 도면은 삭제할 수 없습니다. 구역을 먼저 삭제하세요.');if(!await confirmBox(`도면 '${f.name}'을(를) 삭제할까요?`,'삭제'))return;await q(sb.from('floorplans').delete().eq('id',f.id));await refresh()}));
   A.querySelector('#edf')?.addEventListener('change',e=>{st.edf=e.target.value;resetEd();render()});
   bindEditor();
@@ -399,12 +405,10 @@ function bindEditor(){
   drawEd();
 }
 async function delZone(id){
-  const z=byId(D.z,id),n=assetsIn(id).length;let pw=null;
-  if(n>0){
-    const v=await ask(`'${z.name}' 구역에 자산 ${n}개가 있습니다`,[{k:'pw',label:'삭제 암호를 입력하세요. 구역만 삭제되고 자산은 미배정으로 남습니다.',type:'password'}],'삭제');
-    if(!v)return;pw=v.pw;
-  }else if(!await confirmBox(`구역 '${z.name}'을(를) 삭제할까요?`,'삭제'))return;
-  const by=await who();if(!by)return;
+  const z=byId(D.z,id),n=assetsIn(id).length;
+  const v=await ask(n>0?`'${z.name}' 구역에 자산 ${n}개가 있습니다`:`구역 '${z.name}'을(를) 삭제할까요?`,[...(n>0?[{k:'pw',label:'삭제 암호를 입력하세요. 구역만 삭제되고 자산은 미배정으로 남습니다.',type:'password'}]:[]),whoField()],'삭제');
+  if(!v)return;
+  const pw=n>0?v.pw:null,by=byOf(v);
   const c=await rpc('delete_zone',{p_zone:id,p_password:pw,p_by:by});
   if(ed.zid===id)resetEd();
   await refresh();toast(c>0?`구역을 삭제했습니다. 자산 ${c}개는 미배정입니다.`:'구역을 삭제했습니다.');
