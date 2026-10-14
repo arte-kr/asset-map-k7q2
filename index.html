@@ -159,11 +159,11 @@ function toggleTheme(){
   document.documentElement.dataset.theme=t;
   try{localStorage.setItem('asset_theme',t)}catch(e){}
   document.querySelector('meta[name=theme-color]').content=t==='dark'?'#0a0a09':'#141412';
-  render();
+  render(true);
 }
 function go(h){location.hash=h}
 window.addEventListener('hashchange',()=>{zoom=1;render()});
-async function render(){
+async function render(force){
   const [,r,id]=location.hash.split('/');
   const top=$('#top'),app=$('#app');
   const gear='<button onclick="go(\'#/s\')" class="ic" aria-label="설정" title="설정">'+ICON_GEAR+'</button>',list='<button class="ic" onclick="openPool()" aria-label="자산 검색" title="자산 검색">'+ICON_SEARCH+'</button>',tg=`<button class="ic" onclick="toggleTheme()" aria-label="다크/라이트 모드 전환" title="다크/라이트 모드 전환">${document.documentElement.dataset.theme==='dark'?ICON_SUN:ICON_MOON}</button>`;
@@ -173,7 +173,7 @@ async function render(){
     app.innerHTML=viewPlan(f,b);bindPlan(f);
   }else if(r==='s'){
     top.innerHTML=`<button onclick="go('#/')">←</button><h1>설정</h1>${tg}`;
-    if(ed.pts.length&&app.querySelector('#edst')){return}
+    if(!force&&ed.pts.length&&app.querySelector('#edst')){return}
     app.innerHTML=await viewSettings();bindSettings();
   }else{
     top.innerHTML=`<h1>자산관리</h1>${tg}${list}${gear}`;
@@ -321,7 +321,7 @@ async function viewSettings(){
   <div class="fr"><input id="ff" type="file" accept="image/*"><button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>구역</h2>
   ${D.f.length?`<select id="edf" style="margin-bottom:8px">${D.f.map(f=>`<option value="${f.id}" ${f.id===edf?'selected':''}>${esc(fpName(f))}</option>`).join('')}</select>
-  <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">사각형</button><button class="b3 ${ed.tool==='poly'?'on':''}" id="tpoly">다각형</button><button class="b3" id="tundo">마지막 점 취소</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.tool==='rect'?'도면 위를 드래그하세요':'꼭짓점을 차례로 누르세요 (3개 이상)'}</span></div>
+  <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.tool==='circle'?'원의 중심에서 바깥으로 드래그하세요':'도면 위를 드래그하세요'}</span></div>
   <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(byId(D.f,edf)?.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div></div></div>
   <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">${ed.zid?'수정 저장':'구역 추가'}</button>${ed.zid?'<button class="b2" id="znew">취소</button>':''}</div>
   ${zs.map(z=>`<div class="li"><span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${z.color}"></i> ${esc(z.name)} <span class="muted">자산 ${assetsIn(z.id).length}</span></span><button class="b3" data-zed="${z.id}">수정</button><button class="b3 dg" data-zdel="${z.id}">삭제</button></div>`).join('')}`:'<div class="muted">먼저 도면을 추가하세요.</div>'}</div>
@@ -358,6 +358,7 @@ async function upload(file,code){
 
 /* ---------- 구역 그리기 ---------- */
 function resetEd(){ed={zid:null,tool:ed.tool,pts:[],start:null}}
+const circlePts=(c,e,w,h)=>{const r=Math.hypot((e.x-c.x)*w/100,(e.y-c.y)*h/100),rx=r/w*100,ry=r/h*100,cl=v=>+Math.min(100,Math.max(0,v)).toFixed(2);return Array.from({length:48},(_,i)=>{const a=i/48*2*Math.PI;return{x:cl(c.x+rx*Math.cos(a)),y:cl(c.y+ry*Math.sin(a))}})};
 const rectPts=(a,b)=>[{x:a.x,y:a.y},{x:b.x,y:a.y},{x:b.x,y:b.y},{x:a.x,y:b.y}];
 function drawEd(){
   const sv=$('#edsv');if(!sv)return;
@@ -365,18 +366,19 @@ function drawEd(){
   const col=$('#zc')?.value||COLORS[0];
   sv.innerHTML=others.map(z=>`<polygon points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".25" stroke="${z.color}" style="cursor:crosshair"/>`).join('')
     +(ed.pts.length>1?`<polygon points="${pts2s(ed.pts)}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-dasharray="3 2" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`:'')
-    +ed.pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r=".8" fill="#fff" stroke="${col}" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`).join('');
+    +(ed.pts.length<=8?ed.pts:[]).map(p=>`<circle cx="${p.x}" cy="${p.y}" r=".8" fill="#fff" stroke="${col}" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`).join('');
   $('#edlb').innerHTML=labels(others);
 }
 function bindEditor(){
   const sv=$('#edsv');if(!sv)return;
   const pct=e=>{const r=sv.getBoundingClientRect();const c=v=>+Math.min(100,Math.max(0,v)).toFixed(2);return{x:c((e.clientX-r.left)/r.width*100),y:c((e.clientY-r.top)/r.height*100)}};
-  sv.onpointerdown=e=>{e.preventDefault();if(ed.tool==='rect'){ed.start=pct(e);ed.pts=rectPts(ed.start,ed.start);sv.setPointerCapture(e.pointerId)}else ed.pts.push(pct(e));drawEd()};
-  sv.onpointermove=e=>{if(ed.tool==='rect'&&ed.start){ed.pts=rectPts(ed.start,pct(e));drawEd()}};
-  sv.onpointerup=()=>{if(ed.tool==='rect'&&ed.start){const p=ed.pts;ed.start=null;if(Math.abs(p[2].x-p[0].x)<1||Math.abs(p[2].y-p[0].y)<1)ed.pts=[];drawEd()}};
+  const shape=e=>{const r=sv.getBoundingClientRect();return ed.tool==='circle'?circlePts(ed.start,pct(e),r.width,r.height):rectPts(ed.start,pct(e))};
+  sv.onpointerdown=e=>{e.preventDefault();ed.start=pct(e);ed.pts=[];sv.setPointerCapture(e.pointerId)};
+  sv.onpointermove=e=>{if(ed.start){ed.pts=shape(e);drawEd()}};
+  sv.onpointerup=()=>{if(ed.start){const xs=ed.pts.map(p=>p.x),ys=ed.pts.map(p=>p.y);ed.start=null;if(!xs.length||Math.max(...xs)-Math.min(...xs)<1||Math.max(...ys)-Math.min(...ys)<1)ed.pts=[];drawEd()}};
   const tool=t=>{ed.tool=t;ed.pts=[];ed.start=null;render()};
-  $('#trect').onclick=()=>tool('rect');$('#tpoly').onclick=()=>tool('poly');
-  $('#tundo').onclick=()=>{ed.pts.pop();drawEd()};$('#tclr').onclick=()=>{ed.pts=[];drawEd()};
+  $('#trect').onclick=()=>tool('rect');$('#tcircle').onclick=()=>tool('circle');
+  $('#tclr').onclick=()=>{ed.pts=[];drawEd()};
   $('#zc').onchange=drawEd;
   const z=ed.zid&&byId(D.z,ed.zid);
   if(z){$('#zn').value=z.name;$('#zc').value=z.color}
@@ -390,7 +392,7 @@ function bindEditor(){
     else await q(sb.from('zones').insert({...row,floorplan_id:st.edf}));
     resetEd();await refresh();toast('구역을 저장했습니다.');
   });
-  $('#app').querySelectorAll('[data-zed]').forEach(e=>e.onclick=()=>{const z=byId(D.z,e.dataset.zed);ed.zid=z.id;ed.pts=z.points.map(p=>({...p}));render()});
+  $('#app').querySelectorAll('[data-zed]').forEach(e=>e.onclick=()=>{const z=byId(D.z,e.dataset.zed);ed.zid=z.id;ed.pts=z.points.map(p=>({...p}));render(true).then(()=>$('#edst')?.scrollIntoView({block:'center'}))});
   $('#app').querySelectorAll('[data-zdel]').forEach(e=>e.onclick=()=>act(()=>delZone(e.dataset.zdel)));
   drawEd();
 }
