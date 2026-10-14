@@ -315,9 +315,8 @@ async function viewSettings(){
   <div class="fr" style="margin-top:10px"><input id="bn" placeholder="새 건물 이름"><button class="b1" id="bad">건물 추가</button></div></div>
   <div class="card sec"><h2>도면</h2>
   ${D.b.length?`<select id="fpb" style="margin-bottom:8px">${D.b.map(b=>`<option value="${b.id}" ${b.id===fpb?'selected':''}>${esc(b.name)}</option>`).join('')}</select>
-  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${esc(f.code)} ${f.image_path?'':'· 이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><button class="b3" data-fren="${f.id}">이름·코드</button><button class="b3 dg" data-fdel="${f.id}">삭제</button></div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
+  ${fps.map(f=>`<div class="li"><span><b>${esc(f.name)}</b> <span class="muted">${f.image_path?'':'이미지 없음'}</span></span><label class="b3" style="margin:0;cursor:pointer">이미지 교체<input type="file" accept="image/*" hidden data-fimg="${f.id}"></label><button class="b3 dg" data-fdel="${f.id}">삭제</button></div>`).join('')||'<div class="muted">이 건물에 도면이 없습니다.</div>'}
   <div style="margin-top:12px" class="muted">도면 추가</div>
-  <div class="fr"><input id="fn" placeholder="도면명 (선택 · 비우면 건물명 사용)"><input id="fc" placeholder="도면코드 (선택 · 비우면 도면명 사용)"></div>
   <div class="fr"><input id="ff" type="file" accept="image/*"><button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>구역</h2>
   ${D.f.length?`<select id="edf" style="margin-bottom:8px">${D.f.map(f=>`<option value="${f.id}" ${f.id===edf?'selected':''}>${esc(fpName(f))}</option>`).join('')}</select>
@@ -339,12 +338,11 @@ function bindSettings(){
   on('#fad',async()=>{
     const file=$('#ff').files[0];
     if(!file)throw new Error('도면 이미지 파일을 선택하세요.');
-    const name=$('#fn').value.trim()||byId(D.b,st.fpb).name,code=$('#fc').value.trim()||name;
+    const bn=byId(D.b,st.fpb).name,n=D.f.filter(f=>f.building_id===st.fpb).length,name=n?`${bn} ${n+1}`:bn;let code=name;while(D.f.some(f=>f.code===code))code+='-'+Math.floor(Math.random()*90+10);
     const path=await upload(file,code);
     await q(sb.from('floorplans').insert({building_id:st.fpb,code,name,image_path:path,sort:D.f.length+1}));await refresh();toast('도면을 추가했습니다.');
   });
   A.querySelectorAll('[data-fimg]').forEach(e=>e.onchange=()=>act(async()=>{const f=byId(D.f,e.dataset.fimg),file=e.files[0];if(!file)return;const path=await upload(file,f.code);await q(sb.from('floorplans').update({image_path:path}).eq('id',f.id));await refresh();toast('이미지를 교체했습니다.')}));
-  A.querySelectorAll('[data-fren]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fren),v=await ask('도면 이름·코드',[{k:'name',label:'도면명',value:f.name},{k:'code',label:'도면코드',value:f.code}]);if(!v||!v.name.trim())return;await q(sb.from('floorplans').update({name:v.name.trim(),code:v.code.trim()||v.name.trim()}).eq('id',f.id));await refresh()}));
   A.querySelectorAll('[data-fdel]').forEach(e=>e.onclick=()=>act(async()=>{const f=byId(D.f,e.dataset.fdel);if(zonesOf(f.id).length)throw new Error('구역이 있는 도면은 삭제할 수 없습니다. 구역을 먼저 삭제하세요.');if(!await confirmBox(`도면 '${f.name}'을(를) 삭제할까요?`,'삭제'))return;await q(sb.from('floorplans').delete().eq('id',f.id));await refresh()}));
   A.querySelector('#edf')?.addEventListener('change',e=>{st.edf=e.target.value;resetEd();render()});
   bindEditor();
