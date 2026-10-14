@@ -62,6 +62,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .mh{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;background:var(--dark2);color:#fff;gap:8px}
 .mh .muted{color:rgba(255,255,255,.6)}
 .mb{padding:14px 16px}
+.bk{display:block;margin-bottom:6px;padding:3px 9px}
 .x{border:0;background:none;font-size:18px;color:#fff;cursor:pointer}
 .mb label{display:block;margin-bottom:10px;font-size:12px;color:var(--mu)}
 .mb label input,.mb label select{margin-top:4px;color:var(--tx);font-size:13px}
@@ -141,7 +142,10 @@ async function load(){
 }
 
 function openOv(id,html){const o=$(id);o.hidden=false;o.innerHTML=html;return o}
-function closeModal(){$('#ov').hidden=true;$('#ov').innerHTML='';cur=null}
+let ret=null;
+function closeModal(){$('#ov').hidden=true;$('#ov').innerHTML='';cur=null;ret=null}
+function backToPool(){const r=ret;ret=null;cur={t:'pool',qs:r?.qs||'',f:r?.f||'all'};drawPool()}
+function openZoneFromPool(zid){ret={qs:cur.qs,f:cur.f};openZone(zid)}
 function ask(title,fields=[],ok='확인',mount){
   return new Promise(res=>{
     const f=fields.map(x=>`<label>${esc(x.label)}${x.type==='select'
@@ -269,7 +273,7 @@ function assetRow(a){
 function drawZone(){
   const z=byId(D.z,cur.id);if(!z){closeModal();return}
   const f=byId(D.f,z.floorplan_id),as=assetsIn(z.id);
-  const o=openOv('#ov',`<div class="box"><div class="mh"><div><b>${esc(z.name)}</b><div class="muted">${esc(fpName(f))} · 자산 ${as.length}개</div></div><button class="x" onclick="closeModal()">✕</button></div>
+  const o=openOv('#ov',`<div class="box"><div class="mh"><div>${ret?'<button class="b3 bk" onclick="backToPool()">← 검색 결과</button>':''}<b>${esc(z.name)}</b><div class="muted">${esc(fpName(f))} · 자산 ${as.length}개</div></div><button class="x" title="${ret?'검색 결과로 돌아가기':'닫기'}" onclick="ret?backToPool():closeModal()">✕</button></div>
   <div class="mb"><div class="btns" style="margin:0 0 6px"><button class="b1" data-add>＋ 자산 등록</button></div>${as.length?aHead(false)+as.map(assetRow).join(''):'<div class="empty">이 구역에 자산이 없습니다.</div>'}</div></div>`);
   bindAssets(o,z.id);
 }
@@ -346,7 +350,7 @@ function drawPool(){
   o.querySelector('#pf').onchange=e=>{cur.f=e.target.value;drawPool()};
   o.querySelectorAll('.row').forEach(r=>{
     const id=r.dataset.id,a=byId(D.a,id);bindInfo(r,a);
-    r.querySelector('[data-go]')?.addEventListener('click',()=>openZone(a.zone_id));
+    r.querySelector('[data-go]')?.addEventListener('click',()=>openZoneFromPool(a.zone_id));
     r.querySelector('[data-as]')?.addEventListener('change',e=>{const v=e.target.value;e.target.value='';if(v)act(()=>assignAsset(id,v))});
     r.querySelector('[data-ed]').onclick=()=>act(()=>editAsset(id));
     r.querySelector('[data-hi]').onclick=()=>act(()=>showHist(id,r.querySelector('.hh')));
