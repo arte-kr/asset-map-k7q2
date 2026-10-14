@@ -49,7 +49,7 @@ input,select{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radiu
 .stage img{width:100%;display:block;user-select:none;-webkit-user-drag:none}
 .stage svg{position:absolute;inset:0;width:100%;height:100%}
 .stage polygon{cursor:pointer;stroke-width:1.6;vector-effect:non-scaling-stroke}
-.ed svg{touch-action:none;cursor:crosshair}
+.ed svg{touch-action:none;cursor:crosshair}.hd{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#fff;border:2px solid #1a1917;touch-action:none;cursor:nwse-resize;z-index:2}
 .cn{display:inline-block;margin-left:4px;background:#1a1917;color:#fff;border-radius:8px;min-width:16px;padding:0 5px;font-size:10px;line-height:16px;text-shadow:none;vertical-align:middle}
 .lb{position:absolute;transform:translate(-50%,-50%);font-size:11px;line-height:1.25;text-align:center;pointer-events:none;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;font-weight:700;white-space:nowrap}
 .zl{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
@@ -123,7 +123,7 @@ let D={b:[],f:[],z:[],a:[],s:[]};
 let cur=null;
 let zoom=1;
 const st={fpb:null,edf:null};
-let ed={zid:null,tool:'rect',pts:[],start:null};
+let ed={zid:null,tool:'rect',pts:[],sh:null};
 
 const byId=(arr,id)=>arr.find(x=>x.id===id);
 const zonesOf=fid=>D.z.filter(z=>z.floorplan_id===fid);
@@ -268,8 +268,8 @@ function bindPinch(){
   sc.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();anchor(e.clientX,e.clientY);apply(zoom*(e.deltaY<0?1.15:1/1.15))},{passive:false});
 }
 function edHtml(f){
-  return `<div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.tool==='circle'?'원의 중심에서 바깥으로 드래그하세요':'도면 위를 드래그하세요'}</span></div>
-  <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(f.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div></div></div>
+  return `<div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">정사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.pts.length?'모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요':'도면에서 구역을 놓을 위치를 누르세요'}</span></div>
+  <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(f.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div><div id="edhd" class="hd" hidden></div></div></div>
   <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">구역 추가</button></div>`;
 }
 function openZoneAdd(fid){st.edf=fid;resetEd();cur={t:'zadd',fid};drawZoneAdd()}
@@ -284,7 +284,39 @@ function viewRef(f,b,ri){
   return `${bldChips(b)}${chipRow(f,D.f.filter(x=>x.building_id===b.id),ri,`<button class="b3" onclick="setZoom(-.5)">−</button><button class="b3" onclick="setZoom(.5)">＋</button>`)}
   <div class="scroll"><div class="stage" id="stage" style="width:${zoom*100}%">${isPdf(r.path)?'<div id="pdfwrap" class="muted" style="line-height:1.5;padding:16px">도면을 불러오는 중…</div>':`<img src="${imgUrl(r.path)}" alt="">`}</div></div>`;
 }
-function bindPlan(){$('#app').querySelectorAll('[data-z]').forEach(e=>e.onclick=()=>openZone(e.dataset.z))}
+function bindPlan(){
+  let moved=0;
+  $('#app').querySelectorAll('[data-z]').forEach(e=>e.onclick=()=>{if(moved){moved=0;return}openZone(e.dataset.z)});
+  const sv=$('#stage svg'),stg=$('#stage');if(!sv)return;
+  const polys=[...sv.querySelectorAll('polygon')],lbs=[...stg.querySelectorAll('.lb')];
+  let mv=null;
+  sv.addEventListener('touchmove',e=>{if(mv&&mv.on)e.preventDefault()},{passive:false});
+  sv.addEventListener('contextmenu',e=>e.preventDefault());
+  polys.forEach((pl,i)=>{
+    const z=byId(D.z,pl.dataset.z),lb=lbs[i];
+    pl.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse'&&e.button!==0)return;
+      mv={x:e.clientX,y:e.clientY,on:false,dx:0,dy:0,id:e.pointerId};
+      mv.t=setTimeout(()=>{mv.on=true;pl.setPointerCapture(mv.id);pl.style.fillOpacity='.6';pl.style.strokeDasharray='3 2';if(navigator.vibrate)navigator.vibrate(30)},500);
+    });
+    pl.addEventListener('pointermove',e=>{
+      if(!mv)return;
+      if(!mv.on){if(Math.hypot(e.clientX-mv.x,e.clientY-mv.y)>10){clearTimeout(mv.t);mv=null}return}
+      const r=sv.getBoundingClientRect(),xs=z.points.map(p=>p.x),ys=z.points.map(p=>p.y);
+      mv.dx=Math.min(100-Math.max(...xs),Math.max(-Math.min(...xs),(e.clientX-mv.x)/r.width*100));
+      mv.dy=Math.min(100-Math.max(...ys),Math.max(-Math.min(...ys),(e.clientY-mv.y)/r.height*100));
+      pl.setAttribute('transform',`translate(${mv.dx} ${mv.dy})`);
+      if(lb){lb.style.transform=`translate(calc(-50% + ${mv.dx/100*r.width}px),calc(-50% + ${mv.dy/100*r.height}px))`}
+    });
+    const end=e=>{
+      if(!mv)return;clearTimeout(mv.t);const m=mv;mv=null;
+      if(!m.on)return;moved=1;setTimeout(()=>{moved=0},400);
+      if(e.type==='pointercancel'||(!m.dx&&!m.dy)){render(true);return}
+      act(async()=>{await q(sb.from('zones').update({points:z.points.map(p=>({x:+(p.x+m.dx).toFixed(2),y:+(p.y+m.dy).toFixed(2)}))}).eq('id',z.id));await refresh();toast(`'${z.name}' 구역을 이동했습니다.`)});
+    };
+    pl.addEventListener('pointerup',end);pl.addEventListener('pointercancel',end);
+  });
+}
 async function renderPdf(url){
   const w=$('#pdfwrap'),tok=renderPdf.t=Symbol();
   try{
@@ -476,8 +508,8 @@ async function viewSettings(){
   <button class="b1" id="fad">도면 추가</button></div>`:'<div class="muted">먼저 건물을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>구역</h2>
   ${D.f.length?`<div class="chips">${D.b.filter(b=>D.f.some(f=>f.building_id===b.id)).map(b=>`<div class="chip ${b.id===edb?'on':''}" data-edb="${b.id}">${esc(b.name)}</div>`).join('')}</div>${D.f.filter(f=>f.building_id===edb).length>1?`<div class="chips">${D.f.filter(f=>f.building_id===edb).map(f=>`<div class="chip ${f.id===edf?'on':''}" data-edf="${f.id}">${esc(f.name)}</div>`).join('')}</div>`:''}
-  <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.tool==='circle'?'원의 중심에서 바깥으로 드래그하세요':'도면 위를 드래그하세요'}</span></div>
-  <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(byId(D.f,edf)?.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div></div></div>
+  <div class="tools"><button class="b3 ${ed.tool==='rect'?'on':''}" id="trect">정사각형</button><button class="b3 ${ed.tool==='circle'?'on':''}" id="tcircle">원형</button><button class="b3" id="tclr">지우기</button><span class="muted">${ed.pts.length?'모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요':'도면에서 구역을 놓을 위치를 누르세요'}</span></div>
+  <div class="scroll"><div class="stage ed" id="edst"><img src="${imgUrl(byId(D.f,edf)?.image_path)}" alt=""><svg id="edsv" viewBox="0 0 100 100" preserveAspectRatio="none"></svg><div id="edlb"></div><div id="edhd" class="hd" hidden></div></div></div>
   <div class="fr" style="margin-top:10px"><input id="zn" placeholder="구역 이름"><select id="zc" style="flex:0 0 110px">${COLORS.map(c=>`<option value="${c}" style="background:${c}">${c}</option>`).join('')}</select><button class="b1" id="zsv">${ed.zid?'수정 저장':'구역 추가'}</button>${ed.zid?'<button class="b2" id="znew">취소</button>':''}</div>
   ${zs.map(z=>`<div class="li"><span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${z.color}"></i> ${esc(z.name)} <span class="muted">자산 ${assetsIn(z.id).length}</span></span><button class="b3" data-zed="${z.id}">수정</button><button class="b3 dg" data-zdel="${z.id}">삭제</button></div>`).join('')}`:'<div class="muted">먼저 도면을 추가하세요.</div>'}</div>
   <div class="card sec"><h2>직원 명단</h2>${D.s.map(s=>`<div class="li"><span>${esc(s.name)}</span><button class="b3 dg" data-sdel="${s.id}">삭제</button></div>`).join('')||'<div class="muted">등록된 직원이 없습니다. 이름을 추가하면 자산 이동·등록 때 작업자와 관리자를 선택할 수 있습니다.</div>'}
@@ -520,28 +552,41 @@ async function upload(file,code){
 }
 
 /* ---------- 구역 그리기 ---------- */
-function resetEd(){ed={zid:null,tool:ed.tool,pts:[],start:null}}
-const circlePts=(c,e,w,h)=>{const r=Math.hypot((e.x-c.x)*w/100,(e.y-c.y)*h/100),rx=r/w*100,ry=r/h*100,cl=v=>+Math.min(100,Math.max(0,v)).toFixed(2);return Array.from({length:48},(_,i)=>{const a=i/48*2*Math.PI;return{x:cl(c.x+rx*Math.cos(a)),y:cl(c.y+ry*Math.sin(a))}})};
-const rectPts=(a,b)=>[{x:a.x,y:a.y},{x:b.x,y:a.y},{x:b.x,y:b.y},{x:a.x,y:b.y}];
+function resetEd(){ed={zid:null,tool:ed.tool,pts:[],sh:null}}
+const ED_DEF=1.8,cl100=v=>+Math.min(100,Math.max(0,v)).toFixed(2);
+const shPts=(s,W,H)=>{const k=W/H;return s.t==='circle'?Array.from({length:48},(_,i)=>{const a=i/48*2*Math.PI;return{x:cl100(s.cx+s.s*Math.cos(a)),y:cl100(s.cy+s.s*k*Math.sin(a))}}):[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>({x:cl100(s.cx+a*s.s),y:cl100(s.cy+b*s.s*k)}))};
+const ptsSh=p=>{const xs=p.map(q=>q.x),ys=p.map(q=>q.y),x0=Math.min(...xs),x1=Math.max(...xs);return{t:p.length===48?'circle':'square',cx:(x0+x1)/2,cy:(Math.min(...ys)+Math.max(...ys))/2,s:(x1-x0)/2}};
 function drawEd(){
   const sv=$('#edsv');if(!sv)return;
   const others=zonesOf(st.edf).filter(z=>z.id!==ed.zid);
   const col=$('#zc')?.value||COLORS[0];
   sv.innerHTML=others.map(z=>`<polygon points="${pts2s(z.points)}" fill="${z.color}" fill-opacity=".25" stroke="${z.color}" style="cursor:crosshair"/>`).join('')
     +(ed.pts.length>1?`<polygon points="${pts2s(ed.pts)}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-dasharray="3 2" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`:'')
-    +(ed.pts.length<=8?ed.pts:[]).map(p=>`<circle cx="${p.x}" cy="${p.y}" r=".8" fill="#fff" stroke="${col}" style="stroke-width:2;vector-effect:non-scaling-stroke"/>`).join('');
+    +'';
+  const hd=$('#edhd');if(hd){const s=ed.pts.length&&ed.sh,r=sv.getBoundingClientRect();hd.hidden=!s;if(s){hd.style.left=(ed.sh.cx+ed.sh.s)+'%';hd.style.top=(ed.sh.t==='circle'?ed.sh.cy:ed.sh.cy+ed.sh.s*r.width/r.height)+'%'}}
   $('#edlb').innerHTML=labels(others);
 }
 function bindEditor(){
   const sv=$('#edsv');if(!sv)return;
   const pct=e=>{const r=sv.getBoundingClientRect();const c=v=>+Math.min(100,Math.max(0,v)).toFixed(2);return{x:c((e.clientX-r.left)/r.width*100),y:c((e.clientY-r.top)/r.height*100)}};
-  const shape=e=>{const r=sv.getBoundingClientRect();return ed.tool==='circle'?circlePts(ed.start,pct(e),r.width,r.height):rectPts(ed.start,pct(e))};
-  sv.onpointerdown=e=>{e.preventDefault();ed.start=pct(e);ed.pts=[];sv.setPointerCapture(e.pointerId)};
-  sv.onpointermove=e=>{if(ed.start){ed.pts=shape(e);drawEd()}};
-  sv.onpointerup=()=>{if(ed.start){const xs=ed.pts.map(p=>p.x),ys=ed.pts.map(p=>p.y);ed.start=null;if(!xs.length||Math.max(...xs)-Math.min(...xs)<1||Math.max(...ys)-Math.min(...ys)<1)ed.pts=[];drawEd()}};
-  const tool=t=>{ed.tool=t;ed.pts=[];ed.start=null;if(cur?.t==='zadd')drawZoneAdd();else render()};
+  const WH=()=>{const r=sv.getBoundingClientRect();return[r.width,r.height]};
+  const hit=p=>{const[W,H]=WH(),s=ed.sh,dx=p.x-s.cx,dy=(p.y-s.cy)*H/W;return s.t==='circle'?Math.hypot(dx,dy)<=s.s:Math.abs(dx)<=s.s&&Math.abs(dy)<=s.s};
+  const move=(c)=>{const s=ed.sh,dx=c.x-s.cx,dy=c.y-s.cy;ed.pts=ed.pts.map(q=>({x:cl100(q.x+dx),y:cl100(q.y+dy)}));s.cx=c.x;s.cy=c.y};
+  let drag=null;
+  sv.onpointerdown=e=>{e.preventDefault();const p=pct(e),[W,H]=WH();
+    if(ed.pts.length&&ed.sh&&hit(p))drag={ox:p.x-ed.sh.cx,oy:p.y-ed.sh.cy};
+    else{if(!ed.sh||!ed.pts.length)ed.sh={t:ed.tool==='circle'?'circle':'square',cx:p.x,cy:p.y,s:ED_DEF};else{ed.sh.cx=p.x;ed.sh.cy=p.y}ed.pts=shPts(ed.sh,W,H);drag={ox:0,oy:0};drawEd()}
+    sv.setPointerCapture(e.pointerId)};
+  sv.onpointermove=e=>{if(drag){const p=pct(e);move({x:p.x-drag.ox,y:p.y-drag.oy});drawEd()}};
+  sv.onpointerup=()=>{if(drag){drag=null;const t=$('#edst')?.parentElement.previousElementSibling.querySelector('.muted');if(t)t.textContent='모양을 끌어 이동하고, 점을 끌어 크기를 조절하세요'}};
+  const hd=$('#edhd');
+  hd.onpointerdown=e=>{e.preventDefault();e.stopPropagation();hd.setPointerCapture(e.pointerId);hd.dr=1};
+  hd.onpointermove=e=>{if(!hd.dr)return;const p=pct(e),[W,H]=WH(),s=ed.sh,dx=Math.abs(p.x-s.cx),dy=Math.abs(p.y-s.cy)*H/W;s.s=Math.min(30,Math.max(.8,s.t==='circle'?Math.hypot(dx,dy):Math.max(dx,dy)));ed.pts=shPts(s,W,H);drawEd()};
+  hd.onpointerup=()=>{hd.dr=0};
+  if(ed.pts.length&&!ed.sh)ed.sh=ptsSh(ed.pts);
+  const tool=t=>{ed.tool=t;if(ed.sh&&ed.pts.length){const[W,H]=WH();ed.sh.t=t==='circle'?'circle':'square';ed.pts=shPts(ed.sh,W,H)}if(cur?.t==='zadd')drawZoneAdd();else render(true)};
   $('#trect').onclick=()=>tool('rect');$('#tcircle').onclick=()=>tool('circle');
-  $('#tclr').onclick=()=>{ed.pts=[];drawEd()};
+  $('#tclr').onclick=()=>{ed.pts=[];ed.sh=null;drawEd()};
   $('#zc').onchange=drawEd;
   const z=ed.zid&&byId(D.z,ed.zid);
   if(z){$('#zn').value=z.name;$('#zc').value=z.color}
@@ -555,7 +600,7 @@ function bindEditor(){
     else await q(sb.from('zones').insert({...row,floorplan_id:st.edf}));
     resetEd();if(cur?.t==='zadd')closeModal();await refresh();toast('구역을 저장했습니다.');
   });
-  $('#app').querySelectorAll('[data-zed]').forEach(e=>e.onclick=()=>{const z=byId(D.z,e.dataset.zed);ed.zid=z.id;ed.pts=z.points.map(p=>({...p}));render(true).then(()=>$('#edst')?.scrollIntoView({block:'center'}))});
+  $('#app').querySelectorAll('[data-zed]').forEach(e=>e.onclick=()=>{const z=byId(D.z,e.dataset.zed);ed.zid=z.id;ed.sh=null;ed.pts=z.points.map(p=>({...p}));render(true).then(()=>$('#edst')?.scrollIntoView({block:'center'}))});
   $('#app').querySelectorAll('[data-zdel]').forEach(e=>e.onclick=()=>act(()=>delZone(e.dataset.zdel)));
   drawEd();
 }
@@ -570,7 +615,7 @@ async function delZone(id){
 }
 
 /* ---------- 새 버전 자동 확인 ---------- */
-const APP_VER='20261014181355';
+const APP_VER='20261014181657';
 async function checkUpdate(){
   try{
     const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'reload'});
